@@ -143,6 +143,35 @@ export default function ModelIO() {
                   </Section>
                 )}
               </>
+            ) : trace.hasEvidence ? (
+              /* The trace DOES carry model I/O — this decision just never
+                 produced a prompt. That is not a gap, it is the design: with
+                 no adverse link there is nothing to diagnose, so gemma.py
+                 returns nominal without spending a call. Worth saying out
+                 loud, because "the model is only invoked when something is
+                 actually wrong" is a cost argument in its own right. */
+              <Section title="PROMPT SENT TO MODEL" note="NO CALL MADE AT THIS DECISION">
+                <div
+                  style={{
+                    border: '1px solid var(--ink-faint)', padding: '11px 13px',
+                    background: 'rgba(var(--ink-rgb),0.04)',
+                  }}
+                >
+                  <div className="t-body" style={{ color: 'var(--neutral)', marginBottom: 7 }}>
+                    NO LINK WAS ADVERSE — THE MODEL WAS NOT INVOKED.
+                  </div>
+                  <div className="t-micro dim" style={{ lineHeight: 1.6, textTransform: 'none', letterSpacing: 0 }}>
+                    Every link on this asset last reported OK, so there was nothing to
+                    diagnose. <span style={{ color: 'var(--ink)' }}>gemma.py</span> returns a
+                    nominal belief and spends no inference — the model runs only when
+                    something is actually wrong.
+                    <br /><br />
+                    To see a real prompt, open{' '}
+                    <span style={{ color: 'var(--accent)' }}>⚑ RUN SCENARIO</span> and pick a
+                    fault, or scrub to a window where this asset is not nominal.
+                  </div>
+                </div>
+              </Section>
             ) : (
               <Section title="PROMPT SENT TO MODEL" note="NOT PRESENT IN THIS TRACE">
                 <div

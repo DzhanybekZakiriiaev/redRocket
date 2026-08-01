@@ -149,6 +149,12 @@ export interface Derived {
   /** decoded contact strips, "A|B" -> per-frame 0/1 */
   strip: Record<string, Uint8Array>
 
+  /** true when this trace carries verbatim model I/O on at least one sample.
+   *  Distinguishes "the trace predates tools/replay_evidence.py" from "this
+   *  particular decision had no prompt because nothing was adverse" — the
+   *  model-I/O panel has to say something different in each case. */
+  hasEvidence: boolean
+
   /** chronological narrative events for the alert box [G] */
   events: TraceEvent[]
   /** frame -> index of the most recent event at or before it, -1 if none */
@@ -350,11 +356,16 @@ export function derive(raw: RawTrace): Derived {
     }
   }
 
+  let hasEvidence = false
+  for (const series of Object.values(raw.beliefs)) {
+    if (series.some(b => b.ev)) { hasEvidence = true; break }
+  }
+
   return {
     meta, raw, sats, gs, gsById, nFrames: N,
     timeAt, posAt,
     contactsByFrame, gossipByFrame, failsByFrame, faultsByFrame,
-    samples, diagnosable, strip, events, eventAtFrame,
+    samples, diagnosable, strip, events, eventAtFrame, hasEvidence,
   }
 }
 
