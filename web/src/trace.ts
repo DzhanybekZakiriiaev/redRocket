@@ -48,6 +48,16 @@ export interface ModelIO {
   raw?: string
   /** the individual evidence fields, already split out of the prompt */
   f?: Record<string, string | number>
+  /**
+   * Elimination steps the model produced BEFORE naming a cause.
+   *
+   * Present only on the reasoning-first arm (sim/advisor/gemma_cot.py). These
+   * are sampled ahead of the cause token, so they genuinely conditioned the
+   * answer. The baseline arm's `rationale` is emitted AFTER the cause and is
+   * therefore a justification written in hindsight — the UI must not present
+   * the two as the same kind of thing.
+   */
+  steps?: string[]
 }
 
 export interface Belief {
@@ -375,11 +385,28 @@ export async function loadTrace(): Promise<Derived> {
   return derive(await res.json())
 }
 
-/** Load one advisor's baked trace, e.g. /trace_gemma.json. */
+/**
+ * Load one advisor's baked trace.
+ *
+ * For the Gemma arm, prefer the reasoning-first trace when it has been built.
+ * It carries the elimination steps the model produced *before* naming a cause,
+ * which is the only version that can honestly be shown as reasoning. It differs
+ * from the baseline on 2 of 2304 samples (0.1%), so the demo's timing is
+ * unaffected. Falls back to the baseline when the file is absent, so a fresh
+ * clone that has not run tools/run_gemma_cot.py still works.
+ */
 export async function loadTraceNamed(advisor: 'gemma' | 'bayes'): Promise<Derived> {
-  const res = await fetch(`/trace_${advisor}.json`)
-  if (!res.ok) throw new Error(`trace_${advisor}.json ${res.status}`)
-  return derive(await res.json())
+  const candidates = advisor === 'gemma'
+    ? ['/trace_gemma_cot.json', '/trace_gemma.json']
+    : ['/trace_bayes.json']
+
+  let lastStatus = 0
+  for (const url of candidates) {
+    const res = await fetch(url)
+    if (res.ok) return derive(await res.json())
+    lastStatus = res.status
+  }
+  throw new Error(`trace_${advisor}.json ${lastStatus}`)
 }
 
 /** Diagnosis accuracy: of the belief samples whose reported link was genuinely

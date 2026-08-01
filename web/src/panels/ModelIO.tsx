@@ -108,29 +108,30 @@ export default function ModelIO() {
             {/* ── EXACT I/O — only from an enriched trace ── */}
             {ev ? (
               <>
-                <Section title="PROMPT SENT TO MODEL" note="VERBATIM · FROM ENRICHED TRACE">
-                  <pre
-                    style={{
-                      font: `10px ${mono}`, lineHeight: 1.55, whiteSpace: 'pre-wrap',
-                      color: 'var(--ink)', background: 'rgba(var(--ink-rgb),0.05)',
-                      border: '1px solid var(--ink-faint)', padding: '10px 12px',
-                      margin: 0, textTransform: 'none', letterSpacing: 0,
-                    }}
-                  >{ev.prompt}</pre>
-                </Section>
-
-                {ev.raw && (
-                  <Section title="RAW MODEL REPLY" note="BEFORE PARSING">
-                    <pre
-                      style={{
-                        font: `10px ${mono}`, lineHeight: 1.55, whiteSpace: 'pre-wrap',
-                        color: 'var(--neutral)', background: 'rgba(var(--ink-rgb),0.05)',
-                        border: '1px solid var(--ink-faint)', padding: '10px 12px',
-                        margin: 0, textTransform: 'none', letterSpacing: 0,
-                      }}
-                    >{ev.raw}</pre>
+                {ev.steps && ev.steps.length > 0 && (
+                  <Section title="MODEL REASONING" note="SAMPLED BEFORE THE ANSWER — NOT WRITTEN AFTER IT">
+                    <div style={{ border: '1px solid var(--ink-faint)', padding: '10px 12px' }}>
+                      {ev.steps.map((s, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 9, marginBottom: 6 }}>
+                          <span className="t-micro" style={{ color: 'var(--accent)', flex: '0 0 auto', width: 14 }}>
+                            {String(i + 1).padStart(2, '0')}
+                          </span>
+                          <span className="t-body" style={{ lineHeight: 1.45, textTransform: 'none' }}>{s}</span>
+                        </div>
+                      ))}
+                      <div className="t-micro faint" style={{ marginTop: 9, fontSize: 8, lineHeight: 1.5 }}>
+                        THESE TOKENS WERE GENERATED AHEAD OF THE CAUSE, SO THEY WERE IN
+                        CONTEXT WHEN IT WAS CHOSEN.
+                      </div>
+                    </div>
                   </Section>
                 )}
+
+                {/* The verbatim prompt and raw reply are deliberately NOT shown.
+                    They are still carried in the trace (ev.prompt / ev.raw) for
+                    anyone who wants to audit them, but on screen a 1700-character
+                    wall of cause-menu text buried the one thing worth reading.
+                    The evidence table below is the same information, legibly. */}
 
                 {ev.f && Object.keys(ev.f).length > 0 && (
                   <Section title="EVIDENCE FIELDS" note="AS EXTRACTED FROM THE OBSERVATION">
@@ -225,8 +226,17 @@ export default function ModelIO() {
               ))}
             </Section>
 
+            {/* On the baseline arm the rationale key comes AFTER cause in the
+                template, so it is a justification for a choice already made.
+                Say so, rather than letting it borrow the authority of the
+                reasoning-first arm's steps. */}
             {sample.rationale && (
-              <Section title="MODEL REASONING" note="RETURNED BY THE MODEL">
+              <Section
+                title={ev?.steps?.length ? 'ONE-LINE SUMMARY' : 'MODEL RATIONALE'}
+                note={ev?.steps?.length
+                  ? 'RETURNED ALONGSIDE THE ANSWER'
+                  : 'GENERATED AFTER THE CAUSE — A JUSTIFICATION, NOT THE REASONING'}
+              >
                 <div className="t-body" style={{ fontStyle: 'italic', lineHeight: 1.5 }}>
                   “{sample.rationale}”
                 </div>
