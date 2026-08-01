@@ -1,0 +1,5 @@
+# Backend (simulator) dependencies.
+# Set up:  python3.13 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+numpy>=2.1
+skyfield>=1.54   # pulls in sgp4 (SGP4 C extension), jplephem, certifi
+pytest>=8

@@ -1,0 +1,18 @@
+{
+  "_note": "Coordinates marked verified:true came from a sourced research pass. Those marked verified:false were entered from memory for visual density and are approximate to within a few km -- fine for a geometry demo, not for anything operational. See FINDINGS.md F-003.",
+  "stations": [
+    {"id": "GS_SVALBARD",  "name": "SVALBARD",    "lat":  78.2297, "lon":   15.4075, "alt_m": 458,  "verified": true,  "role": "polar"},
+    {"id": "GS_POKERFLAT", "name": "POKER FLAT",  "lat":  64.8590, "lon": -147.8490, "alt_m": 320,  "verified": true,  "role": "polar"},
+    {"id": "GS_WALLOPS",   "name": "WALLOPS",     "lat":  37.9400, "lon":  -75.4600, "alt_m": 12,   "verified": true,  "role": "midlat"},
+    {"id": "GS_PUNTA",     "name": "PUNTA ARENAS","lat": -52.9390, "lon":  -70.8510, "alt_m": 35,   "verified": true,  "role": "midlat"},
+    {"id": "GS_AWARUA",    "name": "AWARUA",      "lat": -46.5290, "lon":  168.3800, "alt_m": 3,    "verified": true,  "role": "midlat"},
+
+    {"id": "GS_KIRUNA",    "name": "KIRUNA",      "lat":  67.8571, "lon":   20.9642, "alt_m": 391,  "verified": false, "role": "polar"},
+    {"id": "GS_TROLL",     "name": "TROLL",       "lat": -72.0117, "lon":    2.5350, "alt_m": 1298, "verified": false, "role": "polar"},
+    {"id": "GS_INUVIK",    "name": "INUVIK",      "lat":  68.3195, "lon": -133.5490, "alt_m": 40,   "verified": false, "role": "polar"},
+    {"id": "GS_KOUROU",    "name": "KOUROU",      "lat":   5.2515, "lon":  -52.8046, "alt_m": 10,   "verified": false, "role": "equatorial"},
+    {"id": "GS_REDU",      "name": "REDU",        "lat":  50.0016, "lon":    5.1456, "alt_m": 385,  "verified": false, "role": "midlat"},
+    {"id": "GS_SANTIAGO",  "name": "SANTIAGO",    "lat": -33.1517, "lon":  -70.6683, "alt_m": 730,  "verified": false, "role": "midlat"},
+    {"id": "GS_DONGARA",   "name": "DONGARA",     "lat": -29.0458, "lon":  115.3487, "alt_m": 250,  "verified": false, "role": "midlat"}
+  ]
+}
