@@ -83,7 +83,11 @@ export default function Inspector() {
         <button
           onClick={toggleAdvisor}
           className="t-micro"
-          title="Click (or press V) to compare Gemma vs Bayes on the same faults"
+          title={acc
+            ? `Diagnosis accuracy: ${acc.correct}/${acc.total} decisions where a fault was genuinely active on this asset. `
+              + `Scored from ground-truth faults, so every arm is measured on the same ${acc.total} decision points. `
+              + `Click (or press V) to cycle Gemma / peer cross-check / Bayes on identical faults.`
+            : 'Click (or press V) to cycle the advisor arms on identical faults'}
           style={{
             cursor: 'pointer', background: 'transparent',
             border: '1px solid var(--ink-faint)', padding: '2px 7px',

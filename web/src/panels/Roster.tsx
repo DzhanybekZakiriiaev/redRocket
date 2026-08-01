@@ -20,6 +20,7 @@ function readPal() {
     // Omitting them here handed stateColour an undefined colour, so the roster
     // LED silently stopped flickering on an unsettled posterior.
     warn: g('--warn') || '#F5A623', route: g('--route') || '#9B7BFF',
+    gs: g('--gs') || '#46C46A',
     dimA: 0.45, faintA: 0.18,
   }
 }
