@@ -184,6 +184,8 @@ def main() -> int:
               f"shift={case.shift_observed} peer_cofail=none self_cofail=none")
         print()
         print(f"  OPEN-WORLD GEMMA -> {gemma_str}")
+        if g.get("hypothesis"):
+            print(f"                     hypothesis: {g['hypothesis']}")
         print(f"                     rationale: {g['rationale']}")
         print(f"  BAYES FILTER     -> {bayes_str}{mark}")
         if novel:
