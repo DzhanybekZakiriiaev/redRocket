@@ -17,7 +17,7 @@
 import { useEffect } from 'react'
 import { useStore } from '../store'
 import { clock } from '../clock'
-import { CAUSE_WORD, ACTION_WORD, tPlus, type Cause } from '../trace'
+import { CAUSE_WORD, ACTION_WORD, tPlus, type Cause, type ModelIO as ModelIOEv } from '../trace'
 
 const mono = '"Roboto Mono", ui-monospace, SFMono-Regular, Menlo, monospace'
 
@@ -32,6 +32,101 @@ function Section({ title, note, children }: {
       </div>
       {children}
     </div>
+  )
+}
+
+/** How stale a second opinion was when this decision was taken. The peer's
+ *  timestamp is its own decision time, so the gap is what matters, not the
+ *  wall clock. */
+function agoLabel(then: number, now: number): string {
+  const mins = Math.round((now - then) / 60000)
+  if (mins <= 0) return 'SAME MINUTE'
+  if (mins < 60) return `${mins} MIN AGO`
+  const h = Math.floor(mins / 60), m = mins % 60
+  return m ? `${h} H ${m} MIN AGO` : `${h} H AGO`
+}
+
+const causeWord = (c: string) => CAUSE_WORD[c as Cause] ?? c.toUpperCase()
+
+/* ────────────────────────────────────────────────────────────────────────
+   PEER CROSS-CHECK — what other nodes concluded about the SAME target.
+
+   A single model is badly calibrated: measured against this run it never
+   reports confidence below 0.70, even where the evidence provably cannot
+   settle the question. Confidence therefore cannot be read as a measure of
+   how sure the system is. What CAN be read is whether independent nodes,
+   given the same target, reached the same answer — so this section shows
+   that comparison rather than restating a number the model cannot compute.
+
+   Three states, and the empty one is not filler: a diagnosis nobody checked
+   is a different object from a diagnosis two nodes corroborated, and the
+   panel says which one is on screen.
+   ──────────────────────────────────────────────────────────────────────── */
+function PeerCheck({ peers, consensus, at }: {
+  peers?: ModelIOEv['peers']; consensus?: boolean; at: number
+}) {
+  const list = peers ?? []
+
+  if (list.length === 0) {
+    return (
+      <Section title="PEER CROSS-CHECK" note="NO SECOND OPINION AVAILABLE">
+        <div style={{ border: '1px solid var(--ink-faint)', padding: '10px 12px' }}>
+          <div className="t-body" style={{ color: 'var(--neutral)', lineHeight: 1.5 }}>
+            NO PEER HAD DIAGNOSED THIS TARGET RECENTLY — THIS DIAGNOSIS IS UNCHECKED.
+          </div>
+          <div className="t-micro faint" style={{ marginTop: 9, fontSize: 8, lineHeight: 1.5 }}>
+            THE CONFIDENCE BELOW IS ONE MODEL'S SELF-REPORT, WITH NOTHING TO
+            CONTRADICT IT.
+          </div>
+        </div>
+      </Section>
+    )
+  }
+
+  const split = consensus === false
+  const edge = split ? 'var(--warn)' : 'var(--ink-faint)'
+
+  return (
+    <Section
+      title="PEER CROSS-CHECK"
+      note={`${list.length} INDEPENDENT ${list.length === 1 ? 'NODE' : 'NODES'} ON THE SAME TARGET`}
+    >
+      <div style={{ border: `1px solid ${edge}`, padding: '10px 12px' }}>
+        <div
+          className="t-body"
+          style={{ color: split ? 'var(--warn)' : 'var(--accent)', marginBottom: 9, lineHeight: 1.5 }}
+        >
+          {split
+            ? 'INDEPENDENT NODES DISAGREE — BELIEF HELD ACROSS BOTH'
+            : `${list.length} ${list.length === 1 ? 'PEER AGREES' : 'PEERS AGREE'}`}
+        </div>
+
+        {list.map((p, i) => (
+          <div
+            key={`${p.node}-${i}`}
+            className="t-micro"
+            style={{ display: 'flex', alignItems: 'baseline', gap: 9, marginBottom: 4 }}
+          >
+            <span style={{ flex: '0 0 auto', width: 52 }}>{p.node}</span>
+            <span style={{ flex: '1 1 auto', color: split ? 'var(--warn)' : 'var(--accent)' }}>
+              {causeWord(p.cause)}
+            </span>
+            <span style={{ flex: '0 0 auto', width: 30, textAlign: 'right' }}>
+              {(p.conf * 100).toFixed(0)}%
+            </span>
+            <span className="dim" style={{ flex: '0 0 auto', width: 84, textAlign: 'right' }}>
+              {agoLabel(p.t, at)}
+            </span>
+          </div>
+        ))}
+
+        <div className="t-micro faint" style={{ marginTop: 9, fontSize: 8, lineHeight: 1.5 }}>
+          {split
+            ? 'THIS IS WHY THE POSTERIOR BELOW IS SPLIT — THE MASS IS HELD ACROSS THE COMPETING CAUSES INSTEAD OF COMMITTING TO ONE.'
+            : 'AGREEMENT ACROSS NODES THAT SAW THE TARGET SEPARATELY — NOT ONE MODEL RESTATING ITSELF.'}
+        </div>
+      </div>
+    </Section>
   )
 }
 
@@ -158,6 +253,14 @@ export default function ModelIO() {
                       </div>
                     </div>
                   </Section>
+                )}
+
+                {/* Only on an arm that actually cross-checked. On the older
+                    traces the key is absent everywhere, and an "unchecked"
+                    banner on every decision would report an absence that arm
+                    never claimed to fill — so the section is omitted whole. */}
+                {trace.hasPeerCheck && (
+                  <PeerCheck peers={ev.peers} consensus={ev.consensus} at={sample.sampledAt} />
                 )}
 
                 {/* The verbatim prompt and raw reply are deliberately NOT shown.

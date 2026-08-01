@@ -1,12 +1,15 @@
 import { create } from 'zustand'
-import type { Derived } from './trace'
+import type { AdvisorArm, Derived } from './trace'
 import type { GlobeMode } from './globe'
 
-type AdvisorName = 'gemma' | 'bayes'
+type AdvisorName = AdvisorArm
+
+/** Cycle order for the V key. Arms whose trace was not built are skipped. */
+const ARM_ORDER: AdvisorArm[] = ['gemma', 'peer', 'bayes']
 
 interface S {
-  trace: Derived | null                                  // the ACTIVE advisor's trace
-  traces: { gemma: Derived; bayes: Derived } | null      // both, for the head-to-head
+  trace: Derived | null                                  // the ACTIVE arm's trace
+  traces: Partial<Record<AdvisorArm, Derived>> | null    // every arm that loaded
   advisor: AdvisorName
   selected: string
   playing: boolean
@@ -24,7 +27,7 @@ interface S {
   setModelIO: (v: boolean) => void
   setScenario: (i: number | null) => void
   setTrace: (t: Derived) => void
-  setTraces: (gemma: Derived, bayes: Derived) => void
+  setTraces: (t: Partial<Record<AdvisorArm, Derived>>) => void
   setAdvisor: (a: AdvisorName) => void
   toggleAdvisor: () => void
   select: (id: string) => void
@@ -52,14 +55,24 @@ export const useStore = create<S>((set) => ({
   setModelIO: (v) => set({ modelIO: v }),
   setScenario: (i) => set({ scenario: i }),
   setTrace: (t) => set({ trace: t }),
-  // Both arms run the identical scenario, so their traces are frame-aligned.
-  // Switching advisor swaps only the diagnoses; globe/faults stay put.
-  setTraces: (gemma, bayes) => set({ traces: { gemma, bayes }, trace: gemma, advisor: 'gemma' }),
-  setAdvisor: (a) => set((st) => (st.traces ? { advisor: a, trace: st.traces[a] } : {})),
+  // Every arm runs the identical scenario, so the traces are frame-aligned.
+  // Switching arm swaps only the diagnoses; globe/faults stay put.
+  //
+  // Defaults to 'gemma' (reasoning-first) rather than the newest arm. 'peer'
+  // trades 15 points of accuracy for the ability to express uncertainty; that
+  // is a deliberate demo choice, not something to inherit from load order.
+  setTraces: (t) => set({
+    traces: t,
+    trace: t.gemma ?? t.peer ?? t.bayes ?? null,
+    advisor: t.gemma ? 'gemma' : t.peer ? 'peer' : 'bayes',
+  }),
+  setAdvisor: (a) => set((st) => (st.traces?.[a] ? { advisor: a, trace: st.traces[a]! } : {})),
   toggleAdvisor: () => set((st) => {
     if (!st.traces) return {}
-    const a: AdvisorName = st.advisor === 'gemma' ? 'bayes' : 'gemma'
-    return { advisor: a, trace: st.traces[a] }
+    const avail = ARM_ORDER.filter(a => st.traces![a])
+    if (avail.length < 2) return {}
+    const next = avail[(avail.indexOf(st.advisor) + 1) % avail.length]
+    return { advisor: next, trace: st.traces![next]! }
   }),
   select: (id) => set({ selected: id }),
   setPlaying: (p) => set({ playing: p }),

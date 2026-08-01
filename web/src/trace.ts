@@ -58,6 +58,25 @@ export interface ModelIO {
    * the two as the same kind of thing.
    */
   steps?: string[]
+  /**
+   * Other nodes' diagnoses of the SAME target, as this node saw them.
+   *
+   * Present only on the peer cross-check arm. Each entry is one independent
+   * node's conclusion — its cause, its confidence and the unix ms at which it
+   * reached it — so the panel can show how stale each second opinion was.
+   * Emitted as `[]` when no peer had diagnosed this target recently, which is
+   * a meaningful state (the diagnosis went unchecked), not a missing field.
+   */
+  peers?: { node: string; cause: string; conf: number; t: number }[]
+  /**
+   * Did the peers agree with this node's cause?
+   *
+   * true when every peer named the same cause, or when there were no peers at
+   * all. false means independent nodes reached different conclusions from the
+   * same target — the reason the posterior below is spread across the
+   * competing causes instead of committing to one.
+   */
+  consensus?: boolean
 }
 
 export interface Belief {
@@ -164,6 +183,13 @@ export interface Derived {
    *  particular decision had no prompt because nothing was adverse" — the
    *  model-I/O panel has to say something different in each case. */
   hasEvidence: boolean
+
+  /** true when this trace carries peer cross-check results on at least one
+   *  sample. Distinguishes "this arm never cross-checked anything" — where the
+   *  panel must stay silent rather than invent an absence — from "this
+   *  particular decision found no peer to check against", which is worth
+   *  saying out loud. */
+  hasPeerCheck: boolean
 
   /** chronological narrative events for the alert box [G] */
   events: TraceEvent[]
@@ -371,11 +397,17 @@ export function derive(raw: RawTrace): Derived {
     if (series.some(b => b.ev)) { hasEvidence = true; break }
   }
 
+  let hasPeerCheck = false
+  for (const series of Object.values(raw.beliefs)) {
+    if (series.some(b => b.ev?.peers !== undefined)) { hasPeerCheck = true; break }
+  }
+
   return {
     meta, raw, sats, gs, gsById, nFrames: N,
     timeAt, posAt,
     contactsByFrame, gossipByFrame, failsByFrame, faultsByFrame,
-    samples, diagnosable, strip, events, eventAtFrame, hasEvidence,
+    samples, diagnosable, strip, events, eventAtFrame,
+    hasEvidence, hasPeerCheck,
   }
 }
 
@@ -385,26 +417,58 @@ export async function loadTrace(): Promise<Derived> {
   return derive(await res.json())
 }
 
+/** Cheapest check that a parsed body is a trace and not, say, the dev server's
+ *  index.html fallback for a file that was never built. */
+function isRawTrace(b: unknown): b is RawTrace {
+  return typeof b === 'object' && b !== null && 'meta' in b && 'beliefs' in b
+}
+
+/** The three arms the display can hold at once. */
+export type AdvisorArm = 'gemma' | 'peer' | 'bayes'
+
 /**
- * Load one advisor's baked trace.
+ * Load one arm's baked trace.
  *
- * For the Gemma arm, prefer the reasoning-first trace when it has been built.
- * It carries the elimination steps the model produced *before* naming a cause,
- * which is the only version that can honestly be shown as reasoning. It differs
- * from the baseline on 2 of 2304 samples (0.1%), so the demo's timing is
- * unaffected. Falls back to the baseline when the file is absent, so a fresh
- * clone that has not run tools/run_gemma_cot.py still works.
+ *   gemma — reasoning-first (trace_gemma_cot.json), falling back to the
+ *     baseline. Carries the elimination steps the model produced *before*
+ *     naming a cause, and differs from the baseline on 2 of 2304 samples
+ *     (0.1%), so it is the default: richest output at no measured cost.
+ *
+ *   peer — peer cross-check. Deliberately NOT the default. It is the only arm
+ *     that can hold a belief open because independent nodes disagreed (98
+ *     samples below the flicker threshold, against 0 for every other Gemma
+ *     arm) — but it also scores 50.8% against gemma's 65.8%, because confident
+ *     peers propagate their errors as readily as their corrections. That
+ *     trade is the point of the arm, and it should be shown on purpose rather
+ *     than inherited by whoever happens to load the page.
+ *
+ *   bayes — the no-LLM control.
+ *
+ * Missing files fall through, so a clone that has run none of the enrichment
+ * tools still works.
  */
-export async function loadTraceNamed(advisor: 'gemma' | 'bayes'): Promise<Derived> {
-  const candidates = advisor === 'gemma'
-    ? ['/trace_gemma_cot.json', '/trace_gemma.json']
+export async function loadTraceNamed(advisor: AdvisorArm): Promise<Derived> {
+  const candidates =
+    advisor === 'gemma' ? ['/trace_gemma_cot.json', '/trace_gemma.json']
+    : advisor === 'peer' ? ['/trace_gemma_peer.json']
     : ['/trace_bayes.json']
 
   let lastStatus = 0
   for (const url of candidates) {
-    const res = await fetch(url)
-    if (res.ok) return derive(await res.json())
-    lastStatus = res.status
+    let body: unknown
+    try {
+      const res = await fetch(url)
+      if (!res.ok) { lastStatus = res.status; continue }
+      body = await res.json()
+    } catch {
+      /* A dev server with SPA fallback answers a missing file with index.html
+         and a 200, so status alone is not proof the trace exists. A body that
+         will not parse as JSON means the same thing a 404 does: try the next. */
+      lastStatus = 404
+      continue
+    }
+    if (!isRawTrace(body)) { lastStatus = 404; continue }
+    return derive(body)
   }
   throw new Error(`trace_${advisor}.json ${lastStatus}`)
 }
