@@ -16,6 +16,7 @@ import Roster from './panels/Roster'
 import Inspector from './panels/Inspector'
 import Timeline from './panels/Timeline'
 import RightPanel from './panels/RightPanel'
+import ModelIO from './panels/ModelIO'
 import { loadTraceNamed } from './trace'
 import { useStore } from './store'
 import { clock, startClock } from './clock'
@@ -25,15 +26,19 @@ export default function App() {
   const setTraces = useStore(s => s.setTraces)
   const cycleGlobeMode = useStore(s => s.cycleGlobeMode)
   const toggleAdvisor = useStore(s => s.toggleAdvisor)
+  const toggleModelIO = useStore(s => s.toggleModelIO)
+  const toggleProjector = useStore(s => s.toggleProjector)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'm' || e.key === 'M') cycleGlobeMode()
       if (e.key === 'v' || e.key === 'V') toggleAdvisor()   // v = versus: swap the brain
+      if (e.key === 'g' || e.key === 'G') toggleModelIO()   // g = gemma: show the calculation
+      if (e.key === 'p' || e.key === 'P') toggleProjector() // p = projector: lift the faint inks
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [cycleGlobeMode, toggleAdvisor])
+  }, [cycleGlobeMode, toggleAdvisor, toggleModelIO, toggleProjector])
 
   useEffect(() => {
     let alive = true
@@ -63,6 +68,7 @@ export default function App() {
       </div>
       <Timeline />
       <RightPanel />
+      <ModelIO />
       {!trace && (
         <div style={{
           position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',

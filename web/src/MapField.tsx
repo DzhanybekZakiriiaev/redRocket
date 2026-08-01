@@ -8,15 +8,25 @@
 
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import { Globe, coastlines, llToVec, satRadius, type LonLat, type GlobeMode } from './globe'
-import { clock, flickerOn, onFrame } from './clock'
+import { Globe, coastlines, satRadius, type LonLat, type GlobeMode } from './globe'
+import { flickerOn, onFrame } from './clock'
 import { useStore } from './store'
 import { CAUSE_WORD, type Derived, type DState } from './trace'
+import { roleOf, ROLE_TAG } from './sites'
+
+/* ── link declutter ──────────────────────────────────────────────────────
+   Eight satellites with a near-complete ISL mesh puts 14-15 arcs on screen at
+   once, which reads as a ball of yarn and buries the links that matter. The
+   simulator still runs every one of them — this only governs what is DRAWN.
+
+   Kept: all downlinks (a surface contact is where faults surface), plus any
+   ISL touching the selected asset, plus any ISL that is currently failing.
+   Dropped: background satellite-to-satellite chatter with nothing riding on
+   it. Set SHOW_ALL_ISL true to put the full mesh back. */
+const SHOW_ALL_ISL = false
 
 const FONT = '"Roboto Condensed Variable", "Roboto Condensed", sans-serif'
 const f8  = `400 8px ${FONT}`
-const f9  = `400 9px ${FONT}`
-const f10 = `500 10px ${FONT}`
 const f15 = `700 15px ${FONT}`
 
 interface Pal {
@@ -38,8 +48,6 @@ function readPalette(): Pal {
     faintA: parseFloat(g('--a-faint')) || 0.18,
   }
 }
-
-const inkA = (a: number) => `rgba(232,234,237,${a})`
 
 /** Colour for an epistemic state. This is the only place colour is decided. */
 function stateColour(st: DState, pal: Pal, wall: number, phase: number): string {
@@ -66,7 +74,6 @@ const hash = (s: string) => {
    exact in both directions. */
 const ARC_IN = 10
 const ARC_OUT = 7
-const GOSSIP_LIFE = 9
 const FAIL_LIFE = 3
 
 interface P { x: number; y: number; behind: boolean }
@@ -127,8 +134,7 @@ export default function MapField() {
     })
 
     const tmp = new THREE.Vector3()
-    const p: P = { x: 0, y: 0, behind: false }
-    const proj = (lat: number, lon: number, r: number, o: P): boolean => {
+    const proj =(lat: number, lon: number, r: number, o: P): boolean => {
       const la = (lat * Math.PI) / 180, lo = (lon * Math.PI) / 180
       const c = Math.cos(la)
       tmp.set(r * c * Math.cos(lo), r * Math.sin(la), -r * c * Math.sin(lo))
@@ -175,19 +181,7 @@ export default function MapField() {
       ctx.fillStyle = colour
       ctx.fill()
     }
-    /** four-lobed clover — the one --neutral marker class */
-    const quatrefoil = (x: number, y: number, s: number, colour: string) => {
-      const r = s / 3.1
-      ctx.beginPath()
-      for (let i = 0; i < 4; i++) {
-        const a = (i * Math.PI) / 2
-        ctx.moveTo(x + Math.cos(a) * r + r, y + Math.sin(a) * r)
-        ctx.arc(x + Math.cos(a) * r, y + Math.sin(a) * r, r, 0, Math.PI * 2)
-      }
-      ctx.fillStyle = colour
-      ctx.fill()
-    }
-    const label = (t: string, x: number, y: number, font: string, colour: string, align: CanvasTextAlign = 'left', track = '0.12em') => {
+    const label =(t: string, x: number, y: number, font: string, colour: string, align: CanvasTextAlign = 'left', track = '0.12em') => {
       ctx.font = font
       ;(ctx as unknown as { letterSpacing: string }).letterSpacing = track
       ctx.fillStyle = colour
@@ -280,17 +274,6 @@ export default function MapField() {
       }
     }
 
-    /* next contact lookup, cheap enough to do live */
-    const nextContact = (tr: Derived, id: string, t: number) => {
-      let best = Infinity
-      for (const c of tr.raw.contacts) {
-        if (c.a !== id && c.b !== id) continue
-        if (c.t0 > t && c.t0 < best) best = c.t0
-        if (c.t0 <= t && c.t1 > t) return 0
-      }
-      return best === Infinity ? -1 : best
-    }
-
     /* ── the frame ────────────────────────────────────────────────────── */
     const draw = (frame: number, wall: number, dt: number) => {
       globe.render(dt)
@@ -300,7 +283,6 @@ export default function MapField() {
 
       const f = Math.max(0, Math.min(tr.nFrames - 1, frame))
       const fi = Math.round(f)
-      const now = tr.timeAt(f)
       const sel = useStore.getState().selected
       const cx = W / 2, cy = H / 2
 
@@ -357,17 +339,69 @@ export default function MapField() {
       const faultTargets = new Set<string>()
       for (const i of activeFaults) faultTargets.add(tr.raw.faults[i].target)
 
-      /* ── 7 ── ground stations render ONLY when faulted (weather) — a red
-         triangle + ring, the event the whole demo turns on. The old persistent
-         teal triangles read as meaningless landmarks, so a nominal station now
-         draws nothing; its downlink arc already terminates in a numbered box. */
+      /* ── 7 ── surface sites, always drawn.
+         Previously a station appeared only while faulted, which meant the
+         network had no visible ground segment at all until something broke —
+         the globe read as eight satellites orbiting nothing. Every site now
+         holds a persistent marker, shaped by role (see sites.ts: a display
+         convention, NOT simulator state). Operational sites carry a label;
+         the seven non-operational ones stay as bare dim ticks so they add
+         density without competing for attention. A fault still promotes its
+         site to a red triangle inside a ring. */
       for (const g of tr.gs) {
-        if (!g.operational || !faultTargets.has(g.id)) continue
         const q = pos[g.id]
         if (!q || q.behind) continue
-        triangle(q.x, q.y, 11, pal.alert)
-        ctx.save(); ctx.strokeStyle = pal.alert; ctx.globalAlpha = 0.7; ctx.lineWidth = 1
-        ctx.beginPath(); ctx.arc(q.x, q.y, 16, 0, Math.PI * 2); ctx.stroke(); ctx.restore()
+        const faulted = faultTargets.has(g.id)
+        const role = roleOf(g.id)
+
+        if (!g.operational) {
+          ctx.save()
+          ctx.fillStyle = pal.ink
+          ctx.globalAlpha = 0.22
+          ctx.fillRect(q.x - 1.5, q.y - 1.5, 3, 3)
+          ctx.restore()
+          continue
+        }
+
+        const col = faulted ? pal.alert : pal.accent
+        ctx.save()
+        ctx.globalAlpha = faulted ? 1 : 0.85
+        if (role === 'ROVER') {
+          // rover — a small diamond, visually distinct from the dish triangles
+          ctx.fillStyle = col
+          ctx.beginPath()
+          ctx.moveTo(q.x, q.y - 5); ctx.lineTo(q.x + 5, q.y)
+          ctx.lineTo(q.x, q.y + 5); ctx.lineTo(q.x - 5, q.y)
+          ctx.closePath(); ctx.fill()
+        } else {
+          triangle(q.x, q.y, faulted ? 11 : 8, col)
+          if (role === 'DSN') {
+            // deep-space complex — the high-gain dish gets a collar arc
+            ctx.strokeStyle = col
+            ctx.globalAlpha = 0.55
+            ctx.lineWidth = 1
+            ctx.beginPath()
+            ctx.arc(q.x, q.y, 9, Math.PI * 1.15, Math.PI * 1.85)
+            ctx.stroke()
+          }
+        }
+        ctx.restore()
+
+        if (faulted) {
+          ctx.save(); ctx.strokeStyle = pal.alert; ctx.globalAlpha = 0.7; ctx.lineWidth = 1
+          ctx.beginPath(); ctx.arc(q.x, q.y, 16, 0, Math.PI * 2); ctx.stroke(); ctx.restore()
+        }
+
+        ctx.save()
+        ctx.font = f8
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'top'
+        ctx.fillStyle = faulted ? pal.alert : pal.dim
+        ctx.globalAlpha = faulted ? 1 : 0.8
+        ctx.fillText(g.name, q.x, q.y + 9)
+        ctx.globalAlpha = 0.45
+        ctx.fillText(ROLE_TAG[role], q.x, q.y + 18)
+        ctx.restore()
       }
 
       /* ── 8 ── failed contacts: red dashed. A broken link is an error, and
@@ -394,10 +428,23 @@ export default function MapField() {
 
       /* ── 9 ── contact arcs: the network breathing ───────────────────── */
       const arcs: { a: string; b: string; ax: number; ay: number; bx: number; by: number; cx: number; cy: number; dn: boolean }[] = []
+      /* pairs currently in failure — these stay drawn however dense the mesh */
+      const failing = new Set<string>()
+      for (let k = Math.max(0, fi - FAIL_LIFE); k <= fi; k++)
+        for (const i of tr.failsByFrame[k]) {
+          const x = tr.raw.fails[i]
+          failing.add(x.a < x.b ? `${x.a}|${x.b}` : `${x.b}|${x.a}`)
+        }
+
       ctx.save()
       ctx.lineWidth = 1
       for (const i of tr.contactsByFrame[fi]) {
         const c = tr.raw.contacts[i]
+
+        if (!SHOW_ALL_ISL && c.k === 'isl'
+          && c.a !== sel && c.b !== sel
+          && !failing.has(c.a < c.b ? `${c.a}|${c.b}` : `${c.b}|${c.a}`)) continue
+
         const A = pos[c.a], B = pos[c.b]
         if (!A || !B || A.behind || B.behind) continue
         if (Math.hypot(B.x - A.x, B.y - A.y) > Math.max(W, H) * 1.1) continue

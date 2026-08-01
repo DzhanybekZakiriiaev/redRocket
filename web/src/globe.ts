@@ -19,10 +19,31 @@ const EARTH_KM = 6371
 const ALT_SCALE = 1.25           // 631 km * 1.25 / 6371 -> render radius x1.124
 const FOV = 30
 
-/** Sphere apparent radius as a fraction of min(vw,vh). 0.40 keeps the whole
- *  sphere comfortably in frame — a contained, fully-visible globe per the
- *  reference images — rather than overflowing every edge. */
-const CROP = 0.33
+/** Sphere apparent radius as a fraction of min(vw,vh).
+ *
+ *  Raised from 0.33 to give the constellation room, but NOT to the 0.78 that
+ *  UI-SPEC §5 [F] asks for. That spec was written for a globe with nothing
+ *  orbiting it: the satellites draw at up to 1.19x the sphere radius, so any
+ *  CROP above ~0.42 throws them off the top and bottom of the frame entirely.
+ *  0.38 is the largest value that keeps all eight assets on screen. */
+const CROP = 0.38
+
+/* ── orbital shell separation ────────────────────────────────────────────
+   The constellation is physically flat: SAT01 sits at ~631 km and SAT02-08
+   share a ~780-808 km shell, so at true scale every orbit collapses onto one
+   ring and the satellites read as a single blob.
+
+   So the DEVIATION from the reference shell is exaggerated, not the altitude
+   itself. Ordering and relative spacing are preserved — a satellite that is
+   genuinely lower still draws lower — but the shells separate enough to be
+   told apart. This is a display transform only; nothing reads it back, and
+   the altitude quoted in the inspector is the true value from the trace.
+
+   Bounded by the frame: at 3.2 the outer shell lands at 1.19x the sphere
+   radius, which with CROP 0.38 sits just inside the viewport edge. Raising
+   either constant much further starts pushing assets out of view. */
+const ALT_REF_KM = 700
+const ALT_SPREAD = 3.2
 
 export type LonLat = [number, number]
 export type GlobeMode = 'wireframe' | 'mars' | 'earth'
@@ -35,7 +56,10 @@ export function llToVec(latDeg: number, lonDeg: number, r = R): THREE.Vector3 {
   return new THREE.Vector3(r * c * Math.cos(lo), r * Math.sin(la), -r * c * Math.sin(lo))
 }
 
-export const satRadius = (altKm: number) => R * (1 + (altKm / EARTH_KM) * ALT_SCALE)
+export const satRadius = (altKm: number) => {
+  const eff = Math.max(120, ALT_REF_KM + (altKm - ALT_REF_KM) * ALT_SPREAD)
+  return R * (1 + (eff / EARTH_KM) * ALT_SCALE)
+}
 
 /* ── basemap raster ─────────────────────────────────────────────────────── */
 

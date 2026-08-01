@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { clock, onFrame, seek } from '../clock'
 import { tPlus } from '../trace'
+import Scenarios from './Scenarios'
 
 export default function Timeline() {
   const trace = useStore(s => s.trace)
@@ -182,6 +183,7 @@ export default function Timeline() {
             </button>
           ))}
         </div>
+        <Scenarios />
         <div ref={clockEl} className="t-val" style={{ letterSpacing: '0.08em', marginLeft: 'auto' }}>T+00:00:00</div>
       </div>
     </div>

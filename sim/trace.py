@@ -47,8 +47,17 @@ def _positions(cfg: ScenarioConfig, grid: list[int]) -> dict[str, list]:
     return out
 
 
-def build(cfg: ScenarioConfig = DEFAULT, *, advisor_name: str = "bayes"):
-    """Run the full pipeline and assemble the trace."""
+def build(cfg: ScenarioConfig = DEFAULT, *, advisor_name: str = "bayes",
+          advisor=None):
+    """Run the full pipeline and assemble the trace.
+
+    Pass `advisor` to run an arm this registry does not name -- gemma_plus,
+    gemma_openworld, or the replay recorder in tools/replay_evidence.py. It is
+    used as-is and `advisor_name` is ignored; meta.advisor still comes from the
+    instance's own .name, so the trace stays self-describing. Without this the
+    only way to trace a custom arm was to copy this function, which is how
+    tools/run_gemma_plus.py ended up with a duplicate of it.
+    """
     from .engine import Engine
     from . import faults as F
     from .advisor.bayes import BayesAdvisor, NullAdvisor
@@ -58,7 +67,9 @@ def build(cfg: ScenarioConfig = DEFAULT, *, advisor_name: str = "bayes"):
     strip = D.compute(cs, cfg)
     grid = strip.t_grid
 
-    if advisor_name == "bayes":
+    if advisor is not None:
+        pass
+    elif advisor_name == "bayes":
         advisor = BayesAdvisor()
     elif advisor_name == "gemma":
         from .advisor.gemma import GemmaAdvisor

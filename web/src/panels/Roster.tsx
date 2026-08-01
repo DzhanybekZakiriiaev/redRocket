@@ -16,6 +16,10 @@ function readPal() {
   return {
     ink: g('--ink'), dim: g('--ink-dim'), faint: g('--ink-faint'),
     accent: g('--accent'), alert: g('--alert'), neutral: g('--neutral'), bg: g('--bg'),
+    // warn/route are part of Pal and stateColour reads --warn for UNCERTAIN.
+    // Omitting them here handed stateColour an undefined colour, so the roster
+    // LED silently stopped flickering on an unsettled posterior.
+    warn: g('--warn') || '#F5A623', route: g('--route') || '#9B7BFF',
     dimA: 0.45, faintA: 0.18,
   }
 }

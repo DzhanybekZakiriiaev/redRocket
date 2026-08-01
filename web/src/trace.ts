@@ -31,10 +31,31 @@ export interface Fault {
   t_start: number; t_end: number; target: string
   kind: Cause; severity: number; shift_ms: number
 }
+/**
+ * The exact input the advisor was given for one decision, plus what came back.
+ *
+ * NOT derived in the browser — emitted by `tools/replay_evidence.py`, which
+ * replays the baked run through the real GemmaAdvisor prompt builder. Absent
+ * from a trace that predates that tool, in which case the model-I/O panel says
+ * so rather than reconstructing an approximation and passing it off as real.
+ */
+export interface ModelIO {
+  /** the link this decision was about */
+  peer: string
+  /** the literal string sent to the model, byte for byte */
+  prompt: string
+  /** the model's raw reply, before parsing */
+  raw?: string
+  /** the individual evidence fields, already split out of the prompt */
+  f?: Record<string, string | number>
+}
+
 export interface Belief {
   t: number; d: number[]; a: string; tg: string; x: Cause; truth: Cause
   /** advisor's plain-English reason — empty for Bayes/Null, a sentence for Gemma */
   r?: string
+  /** exact model input/output for this decision — present only in enriched traces */
+  ev?: ModelIO
 }
 export interface Gossip { t: number; f: string; to: string; n: number }
 export interface Fail { t: number; a: string; b: string; m: 'silent' | 'degraded' | 'late' }
@@ -91,6 +112,11 @@ export interface SatSample {
   truth: Cause
   /** advisor's plain-English reason — empty for Bayes, a sentence for Gemma */
   rationale: string
+  /** exact model input/output, when the trace carries it */
+  ev?: ModelIO
+  /** unix ms of the belief sample this frame was held from — the decision's
+   *  own timestamp, not the frame's, so the model-I/O panel can label it */
+  sampledAt: number
 }
 
 export interface Derived {
@@ -238,7 +264,7 @@ export function derive(raw: RawTrace): Derived {
         arr[f] = {
           state: 'NOMINAL', cause: 'nominal', conf: 1,
           d: [1, 0, 0, 0, 0, 0], action: 'none', target: '', truth: 'nominal',
-          rationale: '',
+          rationale: '', sampledAt: t,
         }
         continue
       }
@@ -257,7 +283,7 @@ export function derive(raw: RawTrace): Derived {
       arr[f] = {
         state, conf, d: b.d, cause: b.x,
         action: b.a, target: b.tg, truth: b.truth,
-        rationale: b.r ?? '',
+        rationale: b.r ?? '', ev: b.ev, sampledAt: b.t,
       }
 
       /* narrative events on transition */

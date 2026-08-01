@@ -29,6 +29,7 @@ export default function Inspector() {
   }, [])
 
   const toggleAdvisor = useStore(s => s.toggleAdvisor)
+  const setModelIO = useStore(s => s.setModelIO)
   const acc = useMemo(() => (trace ? accuracyOf(trace) : null), [trace])
 
   if (!trace) return null
@@ -114,6 +115,20 @@ export default function Inspector() {
                 </div>
               </div>
             )}
+            <button
+              onClick={() => setModelIO(true)}
+              className="t-micro"
+              title="Show the exact prompt, evidence and reply behind this diagnosis (G)"
+              style={{
+                marginTop: 10, width: '100%', cursor: 'pointer', background: 'transparent',
+                border: '1px solid var(--ink-faint)', padding: '4px 7px',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                letterSpacing: '0.12em',
+              }}
+            >
+              <span style={{ color: 'var(--accent)' }}>SHOW MODEL I/O</span>
+              <span className="faint" style={{ fontSize: 8 }}>G</span>
+            </button>
             <div style={{ marginTop: 12 }}>
               <Head color="var(--accent)">AUTONOMOUS RESPONSE</Head>
               <div className="t-body acc">

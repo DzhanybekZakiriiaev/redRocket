@@ -13,6 +13,16 @@ interface S {
   speed: 0.25 | 0.5 | 1 | 2 | 8
   projector: boolean
   globeMode: GlobeMode
+  /** the model-I/O overlay — "show the calculation behind the screen" */
+  modelIO: boolean
+  /** index into raw.faults of the scenario last jumped to, for button highlight */
+  scenario: number | null
+  /** the scenario picker overlay */
+  scenarioPicker: boolean
+  setScenarioPicker: (v: boolean) => void
+  toggleModelIO: () => void
+  setModelIO: (v: boolean) => void
+  setScenario: (i: number | null) => void
   setTrace: (t: Derived) => void
   setTraces: (gemma: Derived, bayes: Derived) => void
   setAdvisor: (a: AdvisorName) => void
@@ -34,6 +44,13 @@ export const useStore = create<S>((set) => ({
   speed: 1,
   projector: false,
   globeMode: 'wireframe',
+  modelIO: false,
+  scenario: null,
+  scenarioPicker: false,
+  setScenarioPicker: (v) => set({ scenarioPicker: v }),
+  toggleModelIO: () => set((st) => ({ modelIO: !st.modelIO })),
+  setModelIO: (v) => set({ modelIO: v }),
+  setScenario: (i) => set({ scenario: i }),
   setTrace: (t) => set({ trace: t }),
   // Both arms run the identical scenario, so their traces are frame-aligned.
   // Switching advisor swaps only the diagnoses; globe/faults stay put.
