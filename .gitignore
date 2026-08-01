@@ -1,0 +1,42 @@
+# --- Secrets / environment ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+ENV/
+
+# --- Node / frontend ---
+node_modules/
+web/node_modules/
+web/dist/
+web/.vite/
+*.local
+
+# --- Generated simulator artifacts ---
+# Regenerated with: python -m sim.contacts && python -m sim.diagnosability && python -m sim.trace
+out/
+
+# --- Editor / OS ---
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# --- Claude Code local (personal) settings ---
+.claude/settings.local.json
