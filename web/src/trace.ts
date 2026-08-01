@@ -473,13 +473,40 @@ export async function loadTraceNamed(advisor: AdvisorArm): Promise<Derived> {
   throw new Error(`trace_${advisor}.json ${lastStatus}`)
 }
 
-/** Diagnosis accuracy: of the belief samples whose reported link was genuinely
- *  faulted (truth ≠ nominal), how often did the top cause match the truth.
- *  Computed from the raw 5-minute grid so it matches the offline figure. */
+/**
+ * Diagnosis accuracy, scored on a test set that does not depend on the arm.
+ *
+ * The obvious version — count samples where `truth !== 'nominal'` — is not
+ * comparable across arms, because `truth` describes whichever link that arm
+ * chose to report. The Bayes filter names a link on every decision, so it
+ * accumulates ~1089 scorable samples against Gemma's ~179, and most of the
+ * extra ones are the same easy situation repeated. Comparing two percentages
+ * computed over different populations is not a measurement, and the first
+ * question a careful reader asks is "same test set?"
+ *
+ * So the question asked here is arm-independent: at each decision, was a fault
+ * genuinely active on THIS node (from the trace's ground-truth fault records),
+ * and if so did this arm name its cause? Every arm is then scored on the same
+ * decision points with the same n.
+ *
+ * Known limit, worth stating rather than hiding: only faults whose target is a
+ * satellite are counted (6 of the 8 injected in this run), because a fault at a
+ * ground station has no single node to attribute it to. That exclusion applies
+ * identically to every arm, so the comparison stays fair — it is simply not
+ * "accuracy over all faults".
+ */
 export function accuracyOf(d: Derived): { correct: number; total: number; pct: number } {
   let correct = 0, total = 0
-  for (const series of Object.values(d.raw.beliefs))
-    for (const b of series)
-      if (b.truth !== 'nominal') { total++; if (b.x === b.truth) correct++ }
+  const faults = d.raw.faults
+  for (const [node, series] of Object.entries(d.raw.beliefs)) {
+    const mine = faults.filter(f => f.target === node)
+    if (mine.length === 0) continue
+    for (const b of series) {
+      const f = mine.find(x => b.t >= x.t_start && b.t <= x.t_end)
+      if (!f) continue
+      total++
+      if (b.x === f.kind) correct++
+    }
+  }
   return { correct, total, pct: total ? correct / total : 0 }
 }
