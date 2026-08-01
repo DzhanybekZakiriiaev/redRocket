@@ -51,7 +51,27 @@ export default function ModelIO() {
   if (!open || !trace) return null
 
   const fi = Math.max(0, Math.min(trace.nFrames - 1, Math.round(clock.frame)))
-  const sample = trace.samples[selected]?.[fi]
+  const series = trace.samples[selected]
+  const current = series?.[fi]
+
+  /* Only ~390 of 2304 decisions involved an adverse link, so the model was
+     invoked on 17% of frames. Opening this panel at an arbitrary moment
+     therefore almost always landed on "no call made", which is accurate and
+     useless. Fall back to the nearest decision that DID reason — searching
+     backwards first, since the most recent diagnosis is the relevant one —
+     and label it plainly when it is not the current frame. Everything below
+     then describes that one decision, so reasoning, posterior and result can
+     never come from different moments. */
+  let shownFrame = -1
+  if (current?.ev) {
+    shownFrame = fi
+  } else if (series) {
+    for (let k = fi; k >= 0; k--) if (series[k]?.ev) { shownFrame = k; break }
+    if (shownFrame < 0)
+      for (let k = fi; k < trace.nFrames; k++) if (series[k]?.ev) { shownFrame = k; break }
+  }
+  const sample = shownFrame >= 0 ? series[shownFrame] : current
+  const offCurrent = shownFrame >= 0 && shownFrame !== fi
   const epoch = trace.meta.epoch_ms
   const advisor = (trace.meta.advisor || '').toUpperCase()
   const causes = trace.meta.causes as Cause[]
@@ -96,10 +116,23 @@ export default function ModelIO() {
             ESC ✕
           </button>
         </div>
-        <div className="t-micro dim" style={{ marginTop: 4, marginBottom: 16 }}>
+        <div className="t-micro dim" style={{ marginTop: 4, marginBottom: offCurrent ? 8 : 16 }}>
           {advisor} · DECISION AT T+{sample ? tPlus(sample.sampledAt, epoch) : '—'}
           {ev?.peer ? ` · LINK ${selected} ↔ ${ev.peer}` : ''}
         </div>
+        {offCurrent && (
+          <div
+            className="t-micro"
+            style={{
+              marginBottom: 16, padding: '6px 9px',
+              border: '1px solid var(--ink-faint)', color: 'var(--neutral)',
+              lineHeight: 1.5,
+            }}
+          >
+            {selected} IS NOMINAL RIGHT NOW — SHOWING ITS MOST RECENT ACTUAL
+            DIAGNOSIS. THE MODEL IS ONLY INVOKED WHEN A LINK IS ADVERSE.
+          </div>
+        )}
 
         {!sample ? (
           <div className="t-body dim">NO BELIEF SAMPLE AT THIS FRAME.</div>

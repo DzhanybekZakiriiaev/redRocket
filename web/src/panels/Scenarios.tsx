@@ -68,18 +68,34 @@ export default function Scenarios() {
   const scenarios = useMemo<Scenario[]>(() => {
     if (!trace) return []
     const G = trace.meta.grid_ms, E = trace.meta.epoch_ms
-    return trace.raw.faults.map((f, i) => ({
-      i,
-      label: CAUSE_WORD[f.kind],
-      site: f.target.startsWith('SAT')
-        ? f.target
-        : (trace.gsById[f.target]?.name ?? f.target.replace('GS_', '')),
-      node: subjectOf(trace, i),
-      frame: Math.max(0, Math.round((f.t_start - E) / G)),
-      t: f.t_start,
-      durMin: Math.round((f.t_end - f.t_start) / 60000),
-      severity: f.severity,
-    })).sort((a, b) => a.frame - b.frame)
+    return trace.raw.faults.map((f, i) => {
+      const node = subjectOf(trace, i)
+      const startF = Math.max(0, Math.round((f.t_start - E) / G))
+      const endF = Math.min(trace.nFrames - 1, Math.round((f.t_end - E) / G))
+
+      /* Land on the first frame where this asset actually ran a diagnosis, not
+         on fault onset. A fault only becomes observable at the next contact,
+         and decisions run on a 5-minute grid, so onset-minus-a-few-frames put
+         you somewhere nothing had failed yet and the model had not been
+         called — which is exactly why the reasoning panel came up empty. */
+      let diagF = -1
+      for (let fr = startF; fr <= endF; fr++) {
+        if (trace.samples[node]?.[fr]?.ev) { diagF = fr; break }
+      }
+
+      return {
+        i,
+        label: CAUSE_WORD[f.kind],
+        site: f.target.startsWith('SAT')
+          ? f.target
+          : (trace.gsById[f.target]?.name ?? f.target.replace('GS_', '')),
+        node,
+        frame: diagF >= 0 ? diagF : Math.max(0, startF - LEAD),
+        t: f.t_start,
+        durMin: Math.round((f.t_end - f.t_start) / 60000),
+        severity: f.severity,
+      }
+    }).sort((a, b) => a.frame - b.frame)
   }, [trace])
 
   useEffect(() => {
@@ -93,7 +109,7 @@ export default function Scenarios() {
 
   const run = (s: Scenario) => {
     select(s.node)
-    seek(Math.max(0, s.frame - LEAD))
+    seek(s.frame)
     clock.speed = 0.5
     setSpeed(0.5)
     clock.playing = true
