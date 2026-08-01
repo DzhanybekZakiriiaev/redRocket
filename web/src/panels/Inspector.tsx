@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { clock } from '../clock'
-import { CAUSE_WORD, ACTION_WORD, tPlus, accuracyOf, type Cause } from '../trace'
+import { CAUSE_WORD, ACTION_WORD, actionColor, tPlus, accuracyOf, type Cause } from '../trace'
 
 const ll = (v: number, pos: string, neg: string) => `${Math.abs(v).toFixed(1)}°${v >= 0 ? pos : neg}`
 const rowS: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', marginBottom: 3 }
@@ -41,6 +41,13 @@ export default function Inspector() {
   const causes = trace.meta.causes as Cause[]
   const bars = sample ? causes.map((c, i) => ({ c, p: sample.d[i] ?? 0 })).sort((a, b) => b.p - a.p) : []
   const correct = sample && sample.truth !== 'nominal' ? sample.cause === sample.truth : null
+
+  // Reverse lookup: which OTHER satellites are, right now, diagnosing THIS one?
+  // This is the distributed-inference story from the other side — a faulty
+  // satellite seen through its healthy neighbours' beliefs about it.
+  const diagnosedBy = Object.entries(trace.samples)
+    .filter(([n, series]) => n !== selected && series[fi]?.target === selected)
+    .map(([n, series]) => ({ node: n, cause: series[fi].cause }))
 
   const links = trace.contactsByFrame[fi]
     .map(i => trace.raw.contacts[i])
@@ -107,12 +114,35 @@ export default function Inspector() {
                 <span className="dim" style={{ width: 22, textAlign: 'right', fontSize: 8 }}>{(p * 100).toFixed(0)}</span>
               </div>
             ))}
-            {sample.rationale && (
+            {(sample.rationale || sample.target || diagnosedBy.length > 0) && (
               <div style={{ marginTop: 12 }}>
                 <Head color="var(--accent)">MODEL REASONING</Head>
-                <div className="t-body" style={{ fontStyle: 'italic', lineHeight: 1.4, color: 'var(--ink)' }}>
-                  “{sample.rationale}”
-                </div>
+                {/* Forward: who THIS satellite (the observer, = panel title) is
+                   currently diagnosing. */}
+                {sample.target && (
+                  <div className="t-micro" style={{ marginBottom: 6, display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                    <span className="dim">REASONING ABOUT</span>
+                    <span style={{ color: 'var(--accent)', letterSpacing: '0.06em' }}>{selected} → {sample.target}</span>
+                  </div>
+                )}
+                {sample.rationale && (
+                  <div className="t-body" style={{ fontStyle: 'italic', lineHeight: 1.4, color: 'var(--ink)' }}>
+                    “{sample.rationale}”
+                  </div>
+                )}
+                {/* Reverse: which healthy satellites are diagnosing THIS one —
+                   the distributed-inference story, seen from the faulty node. */}
+                {diagnosedBy.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <div className="t-micro dim" style={{ marginBottom: 4 }}>DIAGNOSED BY {diagnosedBy.length} PEER{diagnosedBy.length > 1 ? 'S' : ''}</div>
+                    {diagnosedBy.slice(0, 4).map(({ node, cause }) => (
+                      <div key={node} className="t-micro" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                        <span style={{ color: 'var(--route)' }}>{node} →</span>
+                        <span className="dim">{CAUSE_WORD[cause]}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             <button
@@ -131,7 +161,7 @@ export default function Inspector() {
             </button>
             <div style={{ marginTop: 12 }}>
               <Head color="var(--accent)">AUTONOMOUS RESPONSE</Head>
-              <div className="t-body acc">
+              <div className="t-body" style={{ color: actionColor(sample.action) }}>
                 {ACTION_WORD[sample.action] ?? sample.action.toUpperCase()}{sample.target ? ` → ${sample.target}` : ''}
               </div>
               {sample.truth !== 'nominal' && (
@@ -157,12 +187,12 @@ export default function Inspector() {
                 ))}
             </div>
 
-            <Head color="var(--alert)">SIGNAL</Head>
+            <Head color="var(--ink)">SIGNAL</Head>
             <div style={{ minHeight: 42 }}>
               {signal.length === 0 ? <div className="t-micro faint">— NOMINAL —</div>
                 : signal.map((s, i) => (
                   <div key={i} className="t-micro" style={rowS}>
-                    <span className="alr">{s.mode.toUpperCase()}</span>
+                    <span style={{ color: 'var(--warn)' }}>{s.mode.toUpperCase()}</span>
                     <span className="dim">{s.peer} · T+{tPlus(trace.timeAt(s.f), epoch).slice(0, 5)}</span>
                   </div>
                 ))}

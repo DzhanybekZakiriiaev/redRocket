@@ -48,7 +48,7 @@ def _positions(cfg: ScenarioConfig, grid: list[int]) -> dict[str, list]:
 
 
 def build(cfg: ScenarioConfig = DEFAULT, *, advisor_name: str = "bayes",
-          advisor=None):
+          advisor=None, n_faults: int = 16):
     """Run the full pipeline and assemble the trace.
 
     Pass `advisor` to run an arm this registry does not name -- gemma_plus,
@@ -57,13 +57,23 @@ def build(cfg: ScenarioConfig = DEFAULT, *, advisor_name: str = "bayes",
     instance's own .name, so the trace stays self-describing. Without this the
     only way to trace a custom arm was to copy this function, which is how
     tools/run_gemma_plus.py ended up with a duplicate of it.
+
+    n_faults defaults to 16 (up from the library default of 8): 8 faults over a
+    24 h horizon left the globe near-silent, but 30 swamped it -- the long
+    node_down/stale_sched faults overlap so heavily that >=5 of 8 satellites are
+    faulted 41% of the time. 16 is the balance: all five causes well-
+    represented and blacklist/reroute/hold exercised, while the globe stays
+    legible (>=5 faulted only ~22% of the time, 1-3 faulted for a third of it).
+    The draw is a deterministic prefix, so the first 8 scripted episodes survive
+    unchanged. Both arms must be built with the SAME n_faults or the head-to-
+    head goes out of frame-alignment.
     """
     from .engine import Engine
     from . import faults as F
     from .advisor.bayes import BayesAdvisor, NullAdvisor
 
     cs = C.read(cfg)
-    fs = F.generate(cs, cfg)
+    fs = F.generate(cs, cfg, n_faults=n_faults)
     strip = D.compute(cs, cfg)
     grid = strip.t_grid
 

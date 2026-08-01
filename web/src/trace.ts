@@ -109,8 +109,21 @@ export const CAUSE_WORD: Record<Cause, string> = {
 }
 
 export const ACTION_WORD: Record<string, string> = {
-  none: 'MONITOR', wait: 'HOLD', reroute: 'REROUTE', blacklist: 'BLACKLIST',
+  none: 'MONITOR', wait: 'HOLD', reroute: 'REROUTE', throttle: 'THROTTLE', blacklist: 'BLACKLIST',
 }
+
+/* Action → colour. Each policy response reads at a glance by hue:
+   monitor = teal (calm) · hold/throttle = amber (holding back, caution) ·
+   reroute = violet (steering onto a new path) · blacklist = red (dropping an
+   asset). Kept beside ACTION_WORD so word and colour never drift apart. */
+export const ACTION_COLOR: Record<string, string> = {
+  none:      'var(--accent)',
+  wait:      'var(--warn)',
+  throttle:  'var(--warn)',
+  reroute:   'var(--route)',
+  blacklist: 'var(--alert)',
+}
+export const actionColor = (a: string): string => ACTION_COLOR[a] ?? 'var(--accent)'
 
 export interface SatSample {
   state: DState

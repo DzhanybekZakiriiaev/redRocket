@@ -31,7 +31,7 @@ const f15 = `700 15px ${FONT}`
 
 interface Pal {
   ink: string; dim: string; faint: string; accent: string; alert: string
-  warn: string; route: string; neutral: string; bg: string
+  warn: string; route: string; neutral: string; gs: string; bg: string
   dimA: number; faintA: number
 }
 
@@ -42,7 +42,7 @@ function readPalette(): Pal {
     ink: g('--ink'), dim: g('--ink-dim'), faint: g('--ink-faint'),
     accent: g('--accent'), alert: g('--alert'),
     warn: g('--warn') || '#F5A623', route: g('--route') || '#9B7BFF',
-    neutral: g('--neutral'),
+    neutral: g('--neutral'), gs: g('--gs') || '#46C46A',
     bg: g('--bg'),
     dimA: parseFloat(g('--a-dim')) || 0.45,
     faintA: parseFloat(g('--a-faint')) || 0.18,
@@ -339,6 +339,15 @@ export default function MapField() {
       const faultTargets = new Set<string>()
       for (const i of activeFaults) faultTargets.add(tr.raw.faults[i].target)
 
+      /* Stations the network is actively blacklisting this frame — any sat whose
+         current policy is `blacklist` names its dropped peer as the target. A
+         blacklisted station goes red like a faulted one: both mean "not usable". */
+      const blacklisted = new Set<string>()
+      for (const s of tr.sats) {
+        const sm = tr.samples[s]?.[fi]
+        if (sm && sm.action === 'blacklist' && sm.target) blacklisted.add(sm.target)
+      }
+
       /* ── 7 ── surface sites, always drawn.
          Previously a station appeared only while faulted, which meant the
          network had no visible ground segment at all until something broke —
@@ -352,6 +361,8 @@ export default function MapField() {
         const q = pos[g.id]
         if (!q || q.behind) continue
         const faulted = faultTargets.has(g.id)
+        const bl = blacklisted.has(g.id)
+        const down = faulted || bl          // red either way: not a usable asset
         const role = roleOf(g.id)
 
         if (!g.operational) {
@@ -363,9 +374,9 @@ export default function MapField() {
           continue
         }
 
-        const col = faulted ? pal.alert : pal.accent
+        const col = down ? pal.alert : pal.gs
         ctx.save()
-        ctx.globalAlpha = faulted ? 1 : 0.85
+        ctx.globalAlpha = down ? 1 : 0.85
         if (role === 'ROVER') {
           // rover — a small diamond, visually distinct from the dish triangles
           ctx.fillStyle = col
@@ -396,8 +407,8 @@ export default function MapField() {
         ctx.font = f8
         ctx.textAlign = 'center'
         ctx.textBaseline = 'top'
-        ctx.fillStyle = faulted ? pal.alert : pal.dim
-        ctx.globalAlpha = faulted ? 1 : 0.8
+        ctx.fillStyle = down ? pal.alert : pal.dim
+        ctx.globalAlpha = down ? 1 : 0.8
         ctx.fillText(g.name, q.x, q.y + 9)
         ctx.globalAlpha = 0.45
         ctx.fillText(ROLE_TAG[role], q.x, q.y + 18)

@@ -19,6 +19,8 @@
   --route:     #9B7BFF;
   /* stale marker class */
   --neutral:   #E8DCC0;
+  /* ground/surface asset — green, so a station never reads as a teal satellite */
+  --gs:        #46C46A;
 
   /* raw alphas, so canvas code can read one number */
   --a-dim:   0.45;
