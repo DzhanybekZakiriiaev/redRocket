@@ -6,6 +6,8 @@
 >
 > Everything else here is authoritative for appearance.
 
+> **Deep-space reskin (PLAN.md C-011 · full brief in [RESKIN-BRIEF.md](RESKIN-BRIEF.md)).** This display now depicts a **Mars relay network**: assets are relay orbiters, "ground stations" are Mars surface sites, the globe body is **Mars**, and the demo fault is a **dust storm**. This is presentation only — no geometry or data change. Where a string below still reads Earth/LEO/"ground station"/"weather", substitute the deep-space label: **LOW EARTH ORBIT → MARS RELAY NETWORK**, **ground station → surface site**, **STATION WX → DUST STORM**.
+
 Emulate a military tactical command display: dense, monochrome, hairline-thin, with sparse accent colour used only where it carries meaning. Reference register is film-production FUI (fictional user interface) for a command-and-control screen — **not** a dashboard, **not** pixel art, **not** a SaaS admin panel.
 
 The governing principle: **the screen is an instrument, not a page.** Everything floats over a live map. Nothing has a solid card background. Nothing is rounded. Nothing glows.
@@ -110,8 +112,8 @@ Top-right, single line, 9px: `LINK SERVER: STATUS ONLINE`. Right-aligned.
 Top-left, below the menu. Title `SITE MAP` at panel-title size with a 1px `--ink-dim` rule beneath it running ~180px. Under the rule, 5 lines at 8px `--ink-dim`, `label: value` pairs, tight line-height:
 
 ```
-LOCATION: LOW EARTH ORBIT
-CONSTELLATION: <name>
+LOCATION: MARS RELAY NETWORK
+CONSTELLATION: RELAY ORBITERS
 MISSION TIME: 04:08:16
 OPERATOR: AUTONOMOUS
 OBJECTIVE: LINK DIAGNOSIS
@@ -140,12 +142,12 @@ Left edge, ~200px wide, vertically centred.
 > A pure wireframe sphere on flat black loses all of it. Worse, the project's view is **global** where the reference is **local** — a whole Earth centred in frame leaves large empty black margins the reference never has.
 >
 > **Do both of these:**
-> 1. **Texture the globe** with desaturated satellite imagery (NASA Blue Marble, pushed to monochrome and darkened to roughly 10–25% luminance). Keep the graticule and continent outlines *on top* of it.
+> 1. **Texture the globe** with a desaturated **Mars** basemap (e.g. Viking/MOLA colour-hillshade or a Mars albedo map, pushed to monochrome and darkened to roughly 10–25% luminance). Keep the graticule and surface outlines *on top* of it. *(Reskin: was NASA Blue Marble / Earth — see the reskin note at the top.)*
 > 2. **Crop, don't fit.** Scale the globe so it overflows the viewport on all edges, exactly as the reference photo does. Never render a complete circle floating in black — that is the single change that will make it stop looking like the reference.
 
 Full-bleed behind everything.
 
-- **Textured sphere with wireframe overlay.** Desaturated satellite basemap beneath; latitude lines every 15°, longitude every 15°, 1px, `--ink-faint`; continents as 1px `--ink-dim` outlines, no fills.
+- **Textured sphere with wireframe overlay.** Desaturated **Mars** basemap beneath; latitude lines every 15°, longitude every 15°, 1px, `--ink-faint`; major surface features (Valles Marineris, the large basins) as 1px `--ink-dim` outlines, no fills.
 - **Dotted overlay grid**: 1px dots on a 14px pitch at `rgba(232,234,237,0.06)`, covering the whole viewport, sitting *above* the globe.
 - **Reticle:** two concentric circles near the viewport centre, 1px `--ink-dim`, radii computed from `min(vw,vh)` — roughly 0.32× and 0.12×. Bearing labels at 9px just outside the outer circle. **The reference uses `360 / 240 / 090 / 180`, not evenly spaced cardinals** — the irregularity is deliberate and reads as instrumentation.
 - **Per-marker range rings.** Individual assets may carry their own thin circle, ~60–90px radius, 1px `--ink-faint`, centred on the chip. Apply to 2–3 markers only, never all — the reference uses them sparsely.
@@ -154,12 +156,12 @@ Full-bleed behind everything.
 ### Marker system (on the map)
 
 1. **Asset chip** — a white `--ink` filled rectangle, 2px radius, ~38×22px, containing the asset's 2-digit index in near-black. Immediately right of it, a 16px circle outline containing a 6px filled dot coloured by diagnosis state.
-   - **Above** the chip: a status word at 8px `--ink-dim` — reference uses `LOCKED`; ours uses `NOMINAL` / `DEGRADED` / `SILENT` / `STATION WX`.
+   - **Above** the chip: a status word at 8px `--ink-dim` — reference uses `LOCKED`; ours uses `NOMINAL` / `DEGRADED` / `SILENT` / `DUST STORM`.
    - **Below** the chip: a metric at 8px `--ink-dim` — reference uses `DISTANCE 191M`; ours uses `NEXT CONTACT 14:22`.
    - **Below-left**, outside the box: a second, *larger* figure at ~15px `--ink` (the reference shows `33`, `02`). Use the asset's contact count or queue depth. This size contrast is a distinctive part of the look — do not flatten it to one type size.
-2. **Ground station** — a 12px teal `--accent` triangle, apex up. Label at 8px beside it.
+2. **Surface site** (rover / lander) — a 12px teal `--accent` triangle, apex up. Label at 8px beside it. *(Reskin: was "ground station".)*
 3. **Fault marker** — **a filled red `--alert` diamond** (rotated square), ~14px across. *Not* a plus or cross — the reference uses solid diamonds and they read very differently at a glance.
-4. **Neutral marker** — a pale cream `--neutral` **quatrefoil** (four-lobed clover), ~12px, filled. The reference scatters 5–6 of these. In our build, use them for ground stations currently under a weather fault.
+4. **Neutral marker** — a pale cream `--neutral` **quatrefoil** (four-lobed clover), ~12px, filled. The reference scatters 5–6 of these. In our build, use them for surface sites currently under a dust storm.
 
 ### Connector arcs
 1px `--accent` lines from asset chips to their contact partner, with a slight quadratic curve. Each terminates in a small 10×8px rectangle outline containing a 2-digit number. Arcs animate: draw in over 300ms when a contact window opens, fade out over 200ms when it closes.

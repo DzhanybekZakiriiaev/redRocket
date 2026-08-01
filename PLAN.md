@@ -364,7 +364,13 @@ Factored emission `p(o|s) = Π p(o_k|s)` over the `Observation` fields. Recursio
 
 This is a complete working diagnosis system with no LLM involved. **Build it before the Gemma path** — it de-risks everything downstream and it is the number the LLM has to justify itself against.
 
-**`gemma.py`** — belief extraction via single-token logprobs.
+**`gemma.py`** — belief extraction from a small edge model.
+
+> **Deep-space reskin (C-011): model + serving updated.** The advisor is now **Gemma 4 E4B** — the ~4.5B-effective edge model in the Gemma 4 family (released 2026-04-02, Apache-2.0, multimodal, built to run on Raspberry-Pi-class hardware). We call it via the **hosted Gemini API** (`gemma-4-e4b-it`) for the demo. **Framing (say it straight):** *Gemma 4 E4B is small enough to run on an orbiter's flight computer; each node runs its own instance and only compact `Evidence` crosses the link — we call the hosted API for the demo, but the point is it is edge-sized and onboard-deployable.* The Bayes filter stays as the honest accuracy anchor the LLM is measured against.
+>
+> **Logprob caveat:** the single-token-logprob simplex trick below assumes a llama.cpp `/completion` server that exposes `n_probs`. The hosted Gemini API may not expose per-token logprobs over the A–F tokens. If it does not, fall back to either (a) prompt for the single most-likely cause letter (A–F) and let the Python Bayes recursion supply the distribution, or (b) a short JSON `{cause, confidence, rationale}` — and if the elegant logprob path is worth it, self-host the E4B GGUF locally to recover it. `Policy.rationale` carries Gemma's one-line natural-language explanation either way; that interpretable diagnosis is the contribution.
+
+The original self-hosted logprob design follows (kept as the local-serving alternative).
 
 A grammar cannot enforce that five floats sum to 1. Do not ask the model to write a probability vector; it will emit valid JSON with broken semantics.
 
@@ -380,7 +386,7 @@ Read the six token logprobs, softmax over exactly those tokens → a vector guar
 Serving: **one `llama-server` process with N slots**, not N processes. Each node is a prompt plus Python-side state.
 
 ```bash
-llama-server -m gemma-3-4b-it-q4_0.gguf -ngl 99 -c 32768 -np 8 -cb --cache-reuse 256 --temp 0 --top-k 1 --seed 42 --host 127.0.0.1 --port 8080
+llama-server -m gemma-4-e4b-it-q4_0.gguf -ngl 99 -c 32768 -np 8 -cb --cache-reuse 256 --temp 0 --top-k 1 --seed 42 --host 127.0.0.1 --port 8080
 ```
 
 Verify logprobs are exposed before building on them — use the native `/completion` endpoint, not the OpenAI-compatible one:
@@ -598,8 +604,8 @@ Font: `Roboto Condensed` or `Barlow Condensed`. **Download and self-host the wof
 |---|---|---|
 | D1 | TLE set, committed, never fetched at runtime | CelesTrak `gp.php?GROUP=iridium-NEXT&FORMAT=tle` — **pass `FORMAT` explicitly**, it defaults to CSV |
 | D2 | 10–15 ground stations with real coordinates | Hand-authored JSON. §9 |
-| D3 | Gemma 3 4B QAT Q4_0 GGUF, ~3.3 GB, downloaded in advance | HuggingFace `google/gemma-3-4b-it-qat-q4_0-gguf` |
-| D4 | llama.cpp CUDA binaries + matching `cudart` | Match the CUDA version to the binary or it fails at startup |
+| D3 | **Primary: Gemma 4 E4B via hosted Gemini API** (`gemma-4-e4b-it`) + API key (C-011). Local GGUF is a **fallback only** (for per-token logprobs) | Gemini API / AI Studio; self-host GGUF from HuggingFace if needed |
+| D4 | llama.cpp CUDA binaries + matching `cudart` — **only if self-hosting** the GGUF fallback | Match the CUDA version to the binary or it fails at startup |
 | D5 | Skyfield timescale cache pre-warmed | Avoids a runtime download |
 
 ### 7.3 Technical
@@ -745,7 +751,7 @@ records what the plan now says differently as a result.
 
 | # | Section | Change | Driver |
 |---|---|---|---|
-| C-011 | §1 / §6 | **About to reskin from LEO to deep space.** The scenario framing and visual register are moving from a low-Earth-orbit satellite network to a deep-space setting. Pending — records the intent; section-level rewrites (globe/basemap, framing copy, topology assumptions) follow. | design |
+| C-011 | §1 / §5.3 / §5.4 / §6 | **Reskinned LEO → Mars relay network — presentation only, no rebuild.** The 8 satellites are relay orbiters; the 5 operational "ground stations" are Mars surface sites (rovers / landers); downlinks are orbiter↔surface proximity links; crosslinks are unchanged (orbiter↔orbiter, the gossip highway); Earth's Deep Space Network is offstage — the *reason* autonomy is required, not a node in the sim. The simulator, SGP4 geometry, contact plan, diagnosis layer, and `trace.json` are **byte-for-byte unchanged**; the Earth/Iridium ephemeris is kept as a visual stand-in (no judge audits the ephemeris). **Why:** the premise — *"the node cannot ask anyone; the round trip to ground is long, so it must diagnose autonomously onboard"* — is weak for LEO (a ground pass every ~30 min) and exactly right for deep space (8–48 min Earth round trip). Fault taxonomy remaps 1:1 with signatures preserved (§5.3); the demo fault stays `weather` = **dust storm** (per-site, so a second orbiter failing at the same site is what resolves it — the gossip payoff survives intact). **Light-time delay is narrative only** — it motivates the pitch but is **not** simulated (pure reskin); adding it to the Earth/DSN leg is the natural stretch. **Gemma advisor is now Gemma 4 E4B via the hosted Gemini API** (§5.4), framed honestly as edge-sized / onboard-deployable. Full rationale and file-level plan in `RESKIN-BRIEF.md`. | design pivot |
 | C-010 | §9 / §6.4 | **Operational stations reduced to 5** (the file keeps 12 for globe density, seven rendered dimmed as other networks). Twelve operational gave 47% per-satellite coverage and a 17-minute median gap — not a delay-tolerant network, and the "you cannot ask anyone" premise silently stopped being true. Five gives 21% coverage, 31.7 min median gap, p90 80 min, **and** the best strip available: 100% of downlinks mixed, identifiability 0.521. **Also: the delivered/dropped counter must stay off screen until traffic is sized** — both arms currently deliver identically, so it would show a dead heat. | FINDINGS F-017 |
 | C-009 | §5.2 | **The invariant applies to the likelihood, not the posterior.** §5.2 says the ratio between two unidentifiable causes "equals the prior ratio for all t and all observations". That is right for the observation likelihood and wrong for the posterior: the transition kernel encodes genuinely different dwell times (weather ~5 min, pointing persistent), so a fault still running after ten observations really is more likely pointing. Forbidding the drift would forbid the model from knowing weather is brief. Measured residual drift ~3.3× over ten observations, from dynamics alone — the instantaneous ratio is exactly 1.0. | FINDINGS F-016 |
 | C-008 | §7 F4 | **F4 was overstated and contradicted §6.** It required all five causes to produce the same observable; §6's separability table says `stale_sched` produces a *shifted* contact as its signature. §6 is right. F4 now applies to the four **absence-producing** causes (weather, node_down, pointing, buffer). `stale_sched` is **conditionally** identifiable — `LATE` inside the listening window, `SILENT` and fully confusable outside it — and is reported separately. Verified over 400 real contacts at generator-drawn severities: genuine overlap among all four, no cause nameable from one observation. | FINDINGS F-010 |
@@ -766,4 +772,4 @@ records what the plan now says differently as a result.
 
 ### Settled — do not reopen
 
-Topology (8 sats / 2 planes / 4500 km / 5 operational stations, C-007 and C-010) · F4 premise verified over 400 contacts (C-008) · renderer is Three.js with positions baked into the trace (§6.2) · demo fault is weather, not node death (§6.8) · colour encodes epistemic state, not cause (§6.3).
+Topology (8 sats / 2 planes / 4500 km / 5 operational stations, C-007 and C-010) · F4 premise verified over 400 contacts (C-008) · renderer is Three.js with positions baked into the trace (§6.2) · demo fault is weather, not node death (§6.8) · colour encodes epistemic state, not cause (§6.3) · **deep-space reskin is Mars relay, presentation-only with no geometry/sim change (C-011)** · **reskin renames in the display layer and docs, never the code enums** (protects 125 tests + Bayes constants) · **Gemma is Gemma 4 E4B via the hosted Gemini API, framed as edge-deployable (C-011)**.

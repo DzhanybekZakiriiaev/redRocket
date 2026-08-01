@@ -54,8 +54,8 @@ Space Navigation).** The track asks for tools that assist with:
 | "autonomous navigation when communicating with Earth is delayed" | The entire thesis — onboard diagnosis under light-time delay |
 | "orbital anomaly detection" | The **pointing / attitude (star-tracker)** fault is exactly an orbital/attitude anomaly the node detects itself |
 | "real-time telemetry analysis" | Per-node belief panels reading live telemetry into a diagnosis |
-| "edge-deployed models" | **Gemma-3-4b running onboard each spacecraft** is the textbook edge story |
-| "multimodal vision tools" | Gemma-3-4b is multimodal — optional stretch: feed it a star-tracker frame or a telemetry plot image |
+| "edge-deployed models" | **Gemma 4 E4B running onboard each spacecraft** is the textbook edge story (edge-sized, ~4.5B effective, built to run on Raspberry-Pi-class hardware) |
+| "multimodal vision tools" | Gemma 4 E4B is multimodal (text + image, audio on edge models) — optional stretch: feed it a star-tracker frame or a telemetry plot image |
 
 We hit four of the five track keywords without inventing anything new. The pivot
 is aligning the *framing* to machinery that was already pointed this way.
@@ -136,7 +136,7 @@ its current name.
 
 | Internal enum (keep) | Deep-space display name | What it is | Right response |
 |---|---|---|---|
-| `WEATHER` | **Solar conjunction / plasma scintillation** (or DSN weather) | Sun/atmosphere corrupts the link; self-heals over time | **Wait** |
+| `WEATHER` | **Dust storm at a surface site** | Regional/global dust obscures a surface site; degrades every orbiter pass over it (low-elevation edges first) and self-heals over hours–days. **Per-*site*** — which is exactly what lets a second orbiter's gossip resolve it. (Solar conjunction / DSN weather is an alternative flavour, but it isn't per-site, so it fits the sim's per-station model less cleanly.) | **Wait** |
 | `NODE_DOWN` | **Safe-mode / fault-protection trip** | Craft dropped to safe mode; absorbing until ground intervenes | **Blacklist / route around** |
 | `POINTING` | **High-gain antenna pointing / attitude (star-tracker) anomaly** | Mispointed HGA or attitude error — an *orbital anomaly* | **Reroute** |
 | `BUFFER` | **Onboard solid-state recorder saturation** | SSR full; more traffic makes it worse | **Throttle** |
@@ -162,9 +162,9 @@ it overflows the viewport. Retexture only — the projection, crop, and overlay
 math are shared with the 2D canvas and must not move. This is the one real
 frontend change the reskin requires.
 
-### 4.4 Light-time delay (narrative, optional-but-recommended)
+### 4.4 Light-time delay — DECIDED: narrative only (not simulated)
 
-Add a one-way light-time figure (~13 min nominal for Mars) to the copy and,
+Pure reskin means the sim is **not** re-timed. Add a one-way light-time figure (~13 min nominal for Mars) to the copy and,
 if cheap, a visible "Earth round-trip: 26 min" readout. You do **not** need to
 re-time the sim for this — it's a framing number that makes the autonomy story
 land. If you want it in the mechanics, it's a delay applied to the Earth/DSN leg
@@ -186,12 +186,16 @@ protocol: `observe` / `receive` / `decide`) is clean and interchangeable. The
 `null` (baseline) and `bayes` advisors exist. **`gemma.py` does not exist yet.**
 This is the one module the hackathon *requires* and it's the missing one.
 
-**Model:** "gemma 4" almost certainly means **`gemma-3-4b-it`** — the 4-billion-
-param model. It's the right pick for two reasons: it's the edge-deployment sweet
-spot, and it's **multimodal (vision)**, which lines up with the track's
-"multimodal vision tools." Served via the Gemini API / Google AI Studio with an
-API key (also OpenRouter / Together). *There is no Gemma 4; if a different model
-was meant, confirm before building.*
+**Model — CONFIRMED: Gemma 4 E4B via hosted API.** Gemma 4 is real (Google
+DeepMind, released **2026-04-02**, Apache-2.0); the family ships E2B (~2.3B eff.),
+**E4B (~4.5B eff.)**, 26B-A4B (MoE), and dense 31B. We use **`gemma-4-e4b-it`** —
+the edge model, ~4.5B effective, **multimodal** (text + image; audio on edge
+sizes), up to 256K context, built to run on smartphone / Raspberry-Pi-class
+hardware. It is the right pick: edge-deployment sweet spot *and* multimodal,
+matching the track's "edge-deployed" and "multimodal vision" keywords. **Served
+via the hosted Gemini API / AI Studio with an API key** (free tier is rate-limited;
+also reachable on Google Cloud). Self-hosting the E4B GGUF locally is the fallback
+if we want per-token logprobs (see PLAN §5.4).
 
 **Where it plugs in:** Gemma **is** the advisor. It drops into the empty slot
 behind `base.py`, consumes `Observation` objects + gossiped `Evidence` (compact
@@ -205,7 +209,7 @@ measured against a decision-theoretically optimal Bayes filter on the same cost
 matrix" is a *strength* — show the comparison, don't hide it.
 
 **The edge-deployment framing (resolves the api-key tension).** The track rewards
-edge models; we're calling a hosted API. Say it straight: *"Gemma-3-4b is small
+edge models; we're calling a hosted API. Say it straight: *"Gemma 4 E4B is small
 enough to run on the spacecraft's flight computer. We call the API for the demo,
 but the entire point is that it's edge-sized and onboard-deployable — each node
 runs its own instance, and only compact status vectors cross the link."* That's
@@ -217,7 +221,7 @@ novelty is not the routing — it's the **interpretable diagnosis layer**: a
 diagnosis a flight controller can *read*. That's Gemma's rationale text, surfaced
 on demand in the per-node belief panel. Lead with it.
 
-**Optional multimodal stretch (only if ahead):** hand Gemma-3-4b a star-tracker
+**Optional multimodal stretch (only if ahead):** hand Gemma 4 E4B a star-tracker
 frame or a rendered telemetry plot for the pointing/attitude anomaly. Directly
 claims the track's "multimodal vision" keyword. Skip unless the core demo is solid.
 
@@ -250,12 +254,12 @@ From the project's own `PROGRESS.md`, independent of the reskin:
 1. **The constellation breathing.** Mars, relay orbiters on their arcs, contact
    links opening and closing before anything breaks. Already better-looking than
    most of the room.
-2. **Inject a fault** (a *conjunction/weather*-class fade at a relay, **not** node
+2. **Inject a fault** (a **dust storm** at a surface site, **not** node
    death — node death is independent detection wearing the costume of distributed
    inference, and a sharp judge sees through it). Everything looks fine for a beat.
-3. **One halo goes uncertain and flickers between two causes** — the node that
-   noticed can't yet tell conjunction from a pointing error. Its neighbours are
-   calm, oblivious.
+3. **One halo goes uncertain and flickers between two causes** — the orbiter that
+   noticed can't yet tell dust-at-the-site from its own antenna mispoint. Its
+   neighbours are calm, oblivious.
 4. **A relay contact opens, a gossip pulse crosses the arc, the neighbour's halo
    resolves** — then the next one. You physically watch a diagnosis spread across
    the constellation at the speed of orbital mechanics.
@@ -279,22 +283,24 @@ competence, not weakness.
 
 **Track-keyword checklist to hit out loud:** autonomous under delay ✓ · orbital
 anomaly detection (the pointing/attitude fault) ✓ · real-time telemetry analysis
-(belief panels) ✓ · edge-deployed model (Gemma-3-4b onboard) ✓ · multimodal
+(belief panels) ✓ · edge-deployed model (Gemma 4 E4B onboard) ✓ · multimodal
 vision (stretch) ◻.
 
 ---
 
 ## 8. Open decisions the next agent must make
 
-1. **Mars vs lunar** — recommendation: Mars (delay story). Commit before writing copy.
-2. **Display-relabel vs enum rename** — recommendation: display-relabel, keep code
+1. **Mars vs lunar** — ✅ **DECIDED: Mars** (the light-time delay is the whole point of the track). Lunar stays documented as a fallback only.
+2. **Pure reskin vs deeper physics** — ✅ **DECIDED: pure reskin.** Keep the existing geometry/sim untouched; relabel + retexture only. Light-time delay is narrative, **not** simulated (§4.4).
+3. **Gemma model + serving** — ✅ **DECIDED: Gemma 4 E4B via the hosted Gemini API** (§5). Self-host GGUF only if we want logprobs.
+4. **Display-relabel vs enum rename** — recommendation: display-relabel, keep code
    enums (protects 125 tests + Bayes constants). Only rename enums if you have a
    spare day and a reason.
-3. **Build order** — recommendation: (a) verify the frontend renders, (b) build
+5. **Build order** — recommendation: (a) verify the frontend renders, (b) build
    `gemma.py`, (c) apply the reskin copy/labels/texture. Frontend first because
    it's the biggest unknown; Gemma second because it's the requirement; cosmetics
    last because they're cheap and low-risk.
-4. **Multimodal stretch** — only if the core demo is already solid.
+6. **Multimodal stretch** — only if the core demo is already solid.
 
 ---
 
