@@ -101,11 +101,11 @@ export const RESOLVE_HOLD = 90
 /* Cause → the state word that sits under the asset chip. Text, never colour. */
 export const CAUSE_WORD: Record<Cause, string> = {
   nominal:     'NOMINAL',
-  weather:     'STATION WX',
-  node_down:   'SILENT',
-  pointing:    'DEGRADED',
+  weather:     'GS WEATHER',
+  node_down:   'NODE DOWN',
+  pointing:    'MISPOINT',
   buffer:      'BUFFER',
-  stale_sched: 'SCHED',
+  stale_sched: 'SCHED DRIFT',
 }
 
 export const ACTION_WORD: Record<string, string> = {

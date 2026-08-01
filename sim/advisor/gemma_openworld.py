@@ -102,12 +102,17 @@ class OpenWorldGemmaAdvisor(GemmaAdvisor):
             "You are the onboard fault-diagnosis model on a Mars relay orbiter. "
             "A scheduled contact under-performed. From the local evidence alone, "
             "name the single most likely cause. If the evidence does not match any "
-            "of the known signatures B-F, do NOT force-fit one -- choose G.\n\n"
+            "of the known signatures B-F, do NOT force-fit one -- choose G, and "
+            "then use your engineering knowledge to HYPOTHESIZE what the fault "
+            "actually is (e.g. external RF interference/jamming, a radiation-induced "
+            "single-event upset, a thermal anomaly) even though it is not on the "
+            "menu.\n\n"
             f"CAUSES:\n{_MENU_OPEN}\n\n"
             f"EVIDENCE for orbiter {obs.node} <-> {obs.peer}:\n{evidence}\n\n"
             'Reply with ONLY a JSON object, no prose:\n'
             '{"cause": "<one letter A-G>", "confidence": <0..1>, '
-            '"rationale": "<one short sentence>"}'
+            '"hypothesis": "<if G: your best guess of the actual fault, a few '
+            'words; otherwise empty>", "rationale": "<one short sentence>"}'
         )
 
     # -- LLM call (parent's, but tolerant of a bare 'G' in the fallback) ----
@@ -162,7 +167,8 @@ class OpenWorldGemmaAdvisor(GemmaAdvisor):
         parsed = self._call(self._prompt(obs))
         if parsed is None:
             return {"letter": "?", "cause": Cause.NOMINAL.value, "confidence": 0.0,
-                    "rationale": "[gemma unavailable]", "flagged": False}
+                    "hypothesis": "", "rationale": "[gemma unavailable]",
+                    "flagged": False}
         letter = str(parsed.get("cause", "")).strip()[:1].upper()
         mapped = _LETTER_TO_CAUSE_OPEN.get(letter, Cause.NOMINAL)
         cause_val = mapped if isinstance(mapped, str) else mapped.value
@@ -170,6 +176,10 @@ class OpenWorldGemmaAdvisor(GemmaAdvisor):
             "letter": letter,
             "cause": cause_val,
             "confidence": float(parsed.get("confidence", 0.6)),
+            # The LLM's free-text guess at the ACTUAL fault when it flags G --
+            # this is the open-world payoff: it doesn't just reject the known
+            # set, it names what the novel fault probably is.
+            "hypothesis": str(parsed.get("hypothesis", ""))[:160],
             "rationale": str(parsed.get("rationale", ""))[:200],
             "flagged": cause_val == UNKNOWN,
         }
