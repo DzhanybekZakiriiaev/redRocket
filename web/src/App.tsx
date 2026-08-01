@@ -16,38 +16,42 @@ import Roster from './panels/Roster'
 import Inspector from './panels/Inspector'
 import Timeline from './panels/Timeline'
 import RightPanel from './panels/RightPanel'
-import { loadTrace } from './trace'
+import { loadTraceNamed } from './trace'
 import { useStore } from './store'
 import { clock, startClock } from './clock'
 
 export default function App() {
   const trace = useStore(s => s.trace)
-  const setTrace = useStore(s => s.setTrace)
+  const setTraces = useStore(s => s.setTraces)
   const cycleGlobeMode = useStore(s => s.cycleGlobeMode)
+  const toggleAdvisor = useStore(s => s.toggleAdvisor)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'm' || e.key === 'M') cycleGlobeMode()
+      if (e.key === 'v' || e.key === 'V') toggleAdvisor()   // v = versus: swap the brain
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [cycleGlobeMode])
+  }, [cycleGlobeMode, toggleAdvisor])
 
   useEffect(() => {
     let alive = true
-    loadTrace()
-      .then(t => {
+    // Load BOTH arms of the comparison. They share one scenario, so their
+    // frames line up and the toggle swaps only the diagnoses.
+    Promise.all([loadTraceNamed('gemma'), loadTraceNamed('bayes')])
+      .then(([gemma, bayes]) => {
         if (!alive) return
-        clock.nFrames = t.nFrames
+        clock.nFrames = gemma.nFrames
         clock.playing = useStore.getState().playing
         clock.speed = useStore.getState().speed
         clock.ready = true          // gate lifts → the transport advances
-        setTrace(t)
+        setTraces(gemma, bayes)
         startClock()
       })
-      .catch(err => console.error('[trace] failed to load /trace.json', err))
+      .catch(err => console.error('[trace] failed to load advisor traces', err))
     return () => { alive = false }
-  }, [setTrace])
+  }, [setTraces])
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>

@@ -11,7 +11,7 @@ import * as THREE from 'three'
 import { Globe, coastlines, llToVec, satRadius, type LonLat, type GlobeMode } from './globe'
 import { clock, flickerOn, onFrame } from './clock'
 import { useStore } from './store'
-import { CAUSE_WORD, hhmm, type Derived, type DState } from './trace'
+import { CAUSE_WORD, type Derived, type DState } from './trace'
 
 const FONT = '"Roboto Condensed Variable", "Roboto Condensed", sans-serif'
 const f8  = `400 8px ${FONT}`
@@ -21,7 +21,8 @@ const f15 = `700 15px ${FONT}`
 
 interface Pal {
   ink: string; dim: string; faint: string; accent: string; alert: string
-  neutral: string; bg: string; dimA: number; faintA: number
+  warn: string; route: string; neutral: string; bg: string
+  dimA: number; faintA: number
 }
 
 function readPalette(): Pal {
@@ -29,7 +30,9 @@ function readPalette(): Pal {
   const g = (n: string) => cs.getPropertyValue(n).trim()
   return {
     ink: g('--ink'), dim: g('--ink-dim'), faint: g('--ink-faint'),
-    accent: g('--accent'), alert: g('--alert'), neutral: g('--neutral'),
+    accent: g('--accent'), alert: g('--alert'),
+    warn: g('--warn') || '#F5A623', route: g('--route') || '#9B7BFF',
+    neutral: g('--neutral'),
     bg: g('--bg'),
     dimA: parseFloat(g('--a-dim')) || 0.45,
     faintA: parseFloat(g('--a-faint')) || 0.18,
@@ -45,7 +48,9 @@ function stateColour(st: DState, pal: Pal, wall: number, phase: number): string 
     case 'RESOLVED':  return pal.accent
     case 'FAULT':     return pal.alert
     case 'STALE':     return pal.neutral
-    case 'UNCERTAIN': return flickerOn(wall, phase) ? pal.ink : pal.alert
+    // amber, not red — "still deciding between two causes", distinct from a
+    // confirmed fault. Flickers so an unsettled node reads as unsettled.
+    case 'UNCERTAIN': return flickerOn(wall, phase) ? pal.warn : pal.ink
   }
 }
 export { stateColour }
@@ -352,35 +357,26 @@ export default function MapField() {
       const faultTargets = new Set<string>()
       for (const i of activeFaults) faultTargets.add(tr.raw.faults[i].target)
 
-      /* ── 7 ── ground stations ───────────────────────────────────────── */
+      /* ── 7 ── ground stations render ONLY when faulted (weather) — a red
+         triangle + ring, the event the whole demo turns on. The old persistent
+         teal triangles read as meaningless landmarks, so a nominal station now
+         draws nothing; its downlink arc already terminates in a numbered box. */
       for (const g of tr.gs) {
+        if (!g.operational || !faultTargets.has(g.id)) continue
         const q = pos[g.id]
         if (!q || q.behind) continue
-        const wx = faultTargets.has(g.id)
-        if (!g.operational) {
-          // inert: present for density, visibly not in the loop
-          ctx.save()
-          ctx.globalAlpha = 0.55
-          triangle(q.x, q.y, 9, pal.faint)
-          ctx.restore()
-          label(g.name, q.x + 8, q.y + 9, f8, pal.faint, 'left', '0.18em')
-          continue
-        }
-        if (wx) quatrefoil(q.x, q.y, 13, pal.neutral)
-        else triangle(q.x, q.y, 12, pal.accent)
-        label(g.name, q.x + 9, q.y + 10, f8, pal.dim, 'left', '0.18em')
-        if (wx) {
-          label('STATION WX', q.x + 9, q.y + 19, f8, pal.neutral, 'left', '0.18em')
-          ctx.save(); ctx.strokeStyle = pal.neutral; ctx.globalAlpha = 0.5; ctx.lineWidth = 1
-          ctx.beginPath(); ctx.arc(q.x, q.y, 26, 0, Math.PI * 2); ctx.stroke(); ctx.restore()
-        }
+        triangle(q.x, q.y, 11, pal.alert)
+        ctx.save(); ctx.strokeStyle = pal.alert; ctx.globalAlpha = 0.7; ctx.lineWidth = 1
+        ctx.beginPath(); ctx.arc(q.x, q.y, 16, 0, Math.PI * 2); ctx.stroke(); ctx.restore()
       }
 
-      /* ── 8 ── failed contacts: dashed, so the absence is visible ────── */
+      /* ── 8 ── failed contacts: red dashed. A broken link is an error, and
+         every error on this globe is red. Dashed so the absence still reads. */
       ctx.save()
       ctx.setLineDash([3, 4])
       ctx.lineWidth = 1
-      ctx.strokeStyle = pal.faint
+      ctx.globalAlpha = 0.6
+      ctx.strokeStyle = pal.alert
       for (let k = Math.max(0, fi - FAIL_LIFE); k <= fi; k++) {
         for (const i of tr.failsByFrame[k]) {
           const x = tr.raw.fails[i]
@@ -456,31 +452,56 @@ export default function MapField() {
       }
       ctx.restore()
 
-      /* ── 10 ── gossip pulses: a bracket glyph, not a coloured dot ───── */
-      ctx.save()
-      ctx.lineWidth = 1
-      ctx.strokeStyle = pal.accent
-      for (let k = Math.max(0, fi - GOSSIP_LIFE); k <= fi; k++) {
-        for (const i of tr.gossipByFrame[k]) {
-          const gx = tr.raw.gossip[i]
-          const A = pos[gx.f], B = pos[gx.to]
-          if (!A || !B || A.behind || B.behind) continue
-          if (Math.hypot(B.x - A.x, B.y - A.y) > Math.max(W, H) * 1.1) continue
-          const t = Math.max(0, Math.min(1, (f - k) / GOSSIP_LIFE))
-          const cp = arcPath(A.x, A.y, B.x, B.y)
-          const q = qPoint(A.x, A.y, cp.cx, cp.cy, B.x, B.y, t)
-          const ang = Math.atan2(q.ty, q.tx)
-          ctx.globalAlpha = 0.95 * (1 - t * 0.35)
-          ctx.save()
-          ctx.translate(q.x, q.y)
-          ctx.rotate(ang)
-          ctx.beginPath()
-          ctx.moveTo(-4, -4.5); ctx.lineTo(4, 0); ctx.lineTo(-4, 4.5)
-          ctx.stroke()
-          ctx.restore()
-        }
+      /* ── 10 ── gossip glyphs removed — evidence exchange is narrated in the
+         EVENT STREAM panel instead of arrows on the globe. */
+
+      /* ── 10b ── ACTIVE REROUTES. When a node diagnoses a fault it steers
+         traffic to `target`; that decision was invisible on the globe before
+         (it lived only in the inspector). Draw the new path bright violet with
+         a running pulse + arrowhead so a reroute is obvious from across a room.
+         Violet is used for nothing else, so any violet on screen == a reroute. */
+      const shortId = (id: string) =>
+        id.startsWith('SAT') ? idx2(id) : (tr.gsById[id]?.name ?? id.replace('GS_', ''))
+      for (const s of tr.sats) {
+        const sm = tr.samples[s][fi]
+        if (sm.action !== 'reroute' || !sm.target) continue
+        const A = pos[s], B = pos[sm.target]
+        if (!A || !B || A.behind || B.behind) continue
+        if (Math.hypot(B.x - A.x, B.y - A.y) > Math.max(W, H) * 1.1) continue
+        const cp = arcPath(A.x, A.y, B.x, B.y)
+
+        ctx.save()
+        // the new route — thick, glowing violet
+        ctx.strokeStyle = pal.route
+        ctx.shadowColor = pal.route
+        ctx.shadowBlur = 8
+        ctx.globalAlpha = 0.92
+        ctx.lineWidth = 1.6
+        ctx.beginPath()
+        ctx.moveTo(A.x, A.y)
+        ctx.quadraticCurveTo(cp.cx, cp.cy, B.x, B.y)
+        ctx.stroke()
+
+        // traffic now flowing the new way
+        ctx.fillStyle = pal.route
+        const tt = (f * 0.06 + hash(s + sm.target)) % 1
+        const q = qPoint(A.x, A.y, cp.cx, cp.cy, B.x, B.y, tt)
+        ctx.globalAlpha = 1
+        ctx.beginPath(); ctx.arc(q.x, q.y, 2.8, 0, Math.PI * 2); ctx.fill()
+
+        // arrowhead into the target — direction from the curve tangent near B
+        const h = qPoint(A.x, A.y, cp.cx, cp.cy, B.x, B.y, 0.9)
+        const ang = Math.atan2(B.y - h.y, B.x - h.x)
+        ctx.translate(B.x, B.y); ctx.rotate(ang)
+        ctx.beginPath(); ctx.moveTo(2, 0); ctx.lineTo(-8, -4); ctx.lineTo(-8, 4)
+        ctx.closePath(); ctx.fill()
+        ctx.restore()
+
+        // label at the arc apex
+        const mid = qPoint(A.x, A.y, cp.cx, cp.cy, B.x, B.y, 0.5)
+        label(`↻ ${shortId(s)} → ${shortId(sm.target)}`,
+          mid.x, mid.y - 7, f8, pal.route, 'center', '0.14em')
       }
-      ctx.restore()
 
       /* ── 11 ── ground truth fault diamonds ──────────────────────────── */
       for (const i of activeFaults) {
@@ -519,13 +540,29 @@ export default function MapField() {
         ctx.stroke()
         ctx.restore()
 
-        // satellite body — white physical marker; teal only when selected
+        // satellite body colour follows its epistemic state, so state reads
+        // from the globe itself — red=fault, amber=uncertain, teal=resolved.
+        const faulted = sm.state === 'FAULT'
+        const uncertain = sm.state === 'UNCERTAIN'
+        const resolved = sm.state === 'RESOLVED'
+        let bodyCol = pal.ink
+        if (faulted) bodyCol = pal.alert
+        else if (uncertain) bodyCol = flickerOn(wall, si) ? pal.warn : pal.ink
+        else if (resolved || isSel) bodyCol = pal.accent
+        const big = faulted || uncertain || isSel
         ctx.save()
-        ctx.fillStyle = isSel ? pal.accent : pal.ink
-        ctx.shadowColor = isSel ? pal.accent : pal.ink
-        ctx.shadowBlur = isSel ? 8 : 3
-        ctx.beginPath(); ctx.arc(q.x, q.y, isSel ? 3.4 : 2.2, 0, Math.PI * 2); ctx.fill()
+        ctx.fillStyle = bodyCol
+        ctx.shadowColor = bodyCol
+        ctx.shadowBlur = faulted ? 10 : big ? 8 : 3
+        ctx.beginPath(); ctx.arc(q.x, q.y, big ? 3.4 : 2.2, 0, Math.PI * 2); ctx.fill()
         ctx.restore()
+        // attention ring — red for fault, amber for uncertain. Resolved and
+        // nominal stay ringless so the two "needs-attention" states pop.
+        const ringCol = faulted ? pal.alert : uncertain ? pal.warn : null
+        if (ringCol) {
+          ctx.save(); ctx.strokeStyle = ringCol; ctx.globalAlpha = 0.75; ctx.lineWidth = 1
+          ctx.beginPath(); ctx.arc(q.x, q.y, 11, 0, Math.PI * 2); ctx.stroke(); ctx.restore()
+        }
 
         // range rings on a sparse subset only
         if (si === 1 || si === 5) {
@@ -536,8 +573,12 @@ export default function MapField() {
           ctx.restore()
         }
 
-        // status word above the chip — the CAUSE, in text, never in colour
-        label(CAUSE_WORD[sm.cause], chx, chy - 6, f8, pal.dim, 'left', '0.18em')
+        // status word above the chip — only when something is wrong (no NOMINAL)
+        if (sm.state !== 'NOMINAL') {
+          const wcol = sm.state === 'FAULT' ? pal.alert
+            : sm.state === 'UNCERTAIN' ? pal.warn : pal.ink
+          label(CAUSE_WORD[sm.cause], chx, chy - 6, f8, wcol, 'left', '0.18em')
+        }
 
         // the chip itself
         ctx.save()
@@ -556,19 +597,6 @@ export default function MapField() {
         ctx.fillStyle = col
         ctx.beginPath(); ctx.arc(dcx, dcy, 3, 0, Math.PI * 2); ctx.fill()
         ctx.restore()
-
-        // metric below
-        const nc = nextContact(tr, s, now)
-        const metric = nc === 0 ? 'IN CONTACT'
-          : nc < 0 ? 'NO PASS SCHEDULED'
-          : `NEXT CONTACT ${hhmm(nc, tr.meta.epoch_ms)}`
-        label(metric, chx, chy + 33, f8, pal.dim, 'left', '0.18em')
-
-        // below-left, outside the box: the large figure. Size contrast matters.
-        const q_depth = tr.contactsByFrame[fi].filter(i2 => {
-          const c2 = tr.raw.contacts[i2]; return c2.a === s || c2.b === s
-        }).length
-        label(String(q_depth).padStart(2, '0'), chx - 8, chy + 40, f15, pal.ink, 'right', '0em')
 
         if (isSel) {
           ctx.save()

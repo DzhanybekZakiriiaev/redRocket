@@ -2,7 +2,9 @@
 /* Self-hosted condensed grotesque — bundled by Vite, zero runtime network. */
 @import "@fontsource-variable/roboto-condensed/index.css";
 
-/* ── 1. PALETTE — exactly six values. Do not add a seventh. ───────────── */
+/* ── 1. PALETTE — semantic. Each colour means one situation, nothing else.
+   white = healthy/structure · teal = resolved/comms · red = fault ·
+   amber = uncertain (thinking) · violet = active reroute · cream = stale. ── */
 :root {
   --bg:        #0A0B0D;
   --ink:       #E8EAED;
@@ -11,7 +13,11 @@
   --ink-faint: rgba(232, 234, 237, 0.18);
   --accent:    #2EC4C4;
   --alert:     #E03434;
-  /* the one sanctioned extra, for a single marker class */
+  /* uncertain / caution — a node still deciding between two causes */
+  --warn:      #F5A623;
+  /* an active reroute — traffic being steered onto a new path */
+  --route:     #9B7BFF;
+  /* stale marker class */
   --neutral:   #E8DCC0;
 
   /* raw alphas, so canvas code can read one number */

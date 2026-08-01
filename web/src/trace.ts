@@ -89,6 +89,8 @@ export interface SatSample {
   action: string
   target: string
   truth: Cause
+  /** advisor's plain-English reason — empty for Bayes, a sentence for Gemma */
+  rationale: string
 }
 
 export interface Derived {
@@ -236,6 +238,7 @@ export function derive(raw: RawTrace): Derived {
         arr[f] = {
           state: 'NOMINAL', cause: 'nominal', conf: 1,
           d: [1, 0, 0, 0, 0, 0], action: 'none', target: '', truth: 'nominal',
+          rationale: '',
         }
         continue
       }
@@ -254,6 +257,7 @@ export function derive(raw: RawTrace): Derived {
       arr[f] = {
         state, conf, d: b.d, cause: b.x,
         action: b.a, target: b.tg, truth: b.truth,
+        rationale: b.r ?? '',
       }
 
       /* narrative events on transition */
@@ -332,4 +336,22 @@ export async function loadTrace(): Promise<Derived> {
   const res = await fetch('/trace.json')
   if (!res.ok) throw new Error(`trace.json ${res.status}`)
   return derive(await res.json())
+}
+
+/** Load one advisor's baked trace, e.g. /trace_gemma.json. */
+export async function loadTraceNamed(advisor: 'gemma' | 'bayes'): Promise<Derived> {
+  const res = await fetch(`/trace_${advisor}.json`)
+  if (!res.ok) throw new Error(`trace_${advisor}.json ${res.status}`)
+  return derive(await res.json())
+}
+
+/** Diagnosis accuracy: of the belief samples whose reported link was genuinely
+ *  faulted (truth ≠ nominal), how often did the top cause match the truth.
+ *  Computed from the raw 5-minute grid so it matches the offline figure. */
+export function accuracyOf(d: Derived): { correct: number; total: number; pct: number } {
+  let correct = 0, total = 0
+  for (const series of Object.values(d.raw.beliefs))
+    for (const b of series)
+      if (b.truth !== 'nominal') { total++; if (b.x === b.truth) correct++ }
+  return { correct, total, pct: total ? correct / total : 0 }
 }

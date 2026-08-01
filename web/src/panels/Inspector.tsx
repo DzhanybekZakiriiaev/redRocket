@@ -7,10 +7,10 @@
    Every group is fixed-height, so the layout never shifts as data streams in.
    ──────────────────────────────────────────────────────────────────────── */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { clock } from '../clock'
-import { CAUSE_WORD, ACTION_WORD, tPlus, type Cause } from '../trace'
+import { CAUSE_WORD, ACTION_WORD, tPlus, accuracyOf, type Cause } from '../trace'
 
 const ll = (v: number, pos: string, neg: string) => `${Math.abs(v).toFixed(1)}°${v >= 0 ? pos : neg}`
 const rowS: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', marginBottom: 3 }
@@ -27,6 +27,9 @@ export default function Inspector() {
     const id = setInterval(() => setTick(t => (t + 1) % 1e9), 150)
     return () => clearInterval(id)
   }, [])
+
+  const toggleAdvisor = useStore(s => s.toggleAdvisor)
+  const acc = useMemo(() => (trace ? accuracyOf(trace) : null), [trace])
 
   if (!trace) return null
   const fi = Math.max(0, Math.min(trace.nFrames - 1, Math.round(clock.frame)))
@@ -69,7 +72,20 @@ export default function Inspector() {
     <div className="panel" style={{ width: 250, height: '100%', overflow: 'hidden', padding: '11px 13px', display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <span className="t-title acc">{selected}</span>
-        <span className="t-micro dim">ADV {advisor}</span>
+        <button
+          onClick={toggleAdvisor}
+          className="t-micro"
+          title="Click (or press V) to compare Gemma vs Bayes on the same faults"
+          style={{
+            cursor: 'pointer', background: 'transparent',
+            border: '1px solid var(--ink-faint)', padding: '2px 7px',
+            display: 'flex', gap: 6, alignItems: 'baseline', letterSpacing: '0.12em',
+          }}
+        >
+          <span style={{ color: 'var(--accent)' }}>{advisor}</span>
+          <span className="dim" style={{ fontSize: 8 }}>⇄</span>
+          {acc && <span className="acc">{(acc.pct * 100).toFixed(1)}%</span>}
+        </button>
       </div>
       <div className="t-sub">ONBOARD DIAGNOSIS</div>
 
@@ -90,6 +106,14 @@ export default function Inspector() {
                 <span className="dim" style={{ width: 22, textAlign: 'right', fontSize: 8 }}>{(p * 100).toFixed(0)}</span>
               </div>
             ))}
+            {sample.rationale && (
+              <div style={{ marginTop: 12 }}>
+                <Head color="var(--accent)">MODEL REASONING</Head>
+                <div className="t-body" style={{ fontStyle: 'italic', lineHeight: 1.4, color: 'var(--ink)' }}>
+                  “{sample.rationale}”
+                </div>
+              </div>
+            )}
             <div style={{ marginTop: 12 }}>
               <Head color="var(--accent)">AUTONOMOUS RESPONSE</Head>
               <div className="t-body acc">
