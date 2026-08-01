@@ -1,0 +1,140 @@
+@import "tailwindcss";
+/* Self-hosted condensed grotesque — bundled by Vite, zero runtime network. */
+@import "@fontsource-variable/roboto-condensed/index.css";
+
+/* ── 1. PALETTE — exactly six values. Do not add a seventh. ───────────── */
+:root {
+  --bg:        #0A0B0D;
+  --ink:       #E8EAED;
+  --ink-rgb:   232, 234, 237;
+  --ink-dim:   rgba(232, 234, 237, 0.45);
+  --ink-faint: rgba(232, 234, 237, 0.18);
+  --accent:    #2EC4C4;
+  --alert:     #E03434;
+  /* the one sanctioned extra, for a single marker class */
+  --neutral:   #E8DCC0;
+
+  /* raw alphas, so canvas code can read one number */
+  --a-dim:   0.45;
+  --a-faint: 0.18;
+
+  --panel: rgba(10, 11, 13, 0.82);
+  --font:  "Roboto Condensed Variable", "Roboto Condensed", "Barlow Condensed", "Oswald", sans-serif;
+}
+
+/* Projectors crush darks. One class, toggled on the projector, and move on. */
+:root.projector {
+  --ink-faint: rgba(232, 234, 237, 0.30);
+  --ink-dim:   rgba(232, 234, 237, 0.58);
+  --a-dim:   0.58;
+  --a-faint: 0.30;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0; padding: 0;
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  font-size: 10px;
+  line-height: 1.35;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+  cursor: crosshair;
+  user-select: none;
+}
+
+/* ── 2. TYPOGRAPHY ROLES ─────────────────────────────────────────────── */
+.t-title { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; }
+.t-sub   { font-size:  9px; font-weight: 400; letter-spacing: 0.14em; color: var(--ink-dim); }
+.t-body  { font-size: 10px; font-weight: 400; letter-spacing: 0.06em; }
+.t-val   { font-size: 11px; font-weight: 500; letter-spacing: 0.02em; text-transform: none; }
+.t-micro { font-size:  8px; font-weight: 400; letter-spacing: 0.18em; }
+.t-nine  { font-size:  9px; font-weight: 400; letter-spacing: 0.10em; }
+.t-chip  { font-size: 15px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+
+.dim   { color: var(--ink-dim); }
+.faint { color: var(--ink-faint); }
+.acc   { color: var(--accent); }
+.alr   { color: var(--alert); }
+
+/* ── 3. STRUCTURE ────────────────────────────────────────────────────── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--ink-dim);
+  border-radius: 0;
+}
+.hair-b { border-bottom: 1px solid var(--ink-faint); }
+.rule   { height: 1px; background: var(--ink-dim); border: 0; }
+
+/* 45° hatch — used by warning strip [J] and the diagnosability band [P] */
+.hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(232, 234, 237, 0.32) 0px, rgba(232, 234, 237, 0.32) 1px,
+    transparent 1px, transparent 4px
+  );
+}
+
+/* Roster row shear — ~9px of horizontal offset over the 34px height. */
+.shear { clip-path: polygon(9px 0, 100% 0, 100% 100%, 0 100%); }
+
+/* ── 4. TEXTURE — noise + scanlines, above everything ─────────────────── */
+.noise {
+  position: fixed; inset: 0; z-index: 90;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-repeat: repeat;
+  background-size: 200px 200px;
+}
+.scanlines {
+  position: fixed; inset: 0; z-index: 91;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 3px
+  );
+}
+.sweep {
+  position: fixed; left: 0; right: 0; height: 1px; z-index: 92;
+  pointer-events: none;
+  background: rgb(232, 234, 237);
+  opacity: 0.045;
+  animation: sweep 8s linear infinite;
+}
+@keyframes sweep { from { top: -2%; } to { top: 102%; } }
+
+/* ── 5. CONTROLS — stripped to hairlines ─────────────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  background: transparent; width: 100%; height: 15px; margin: 0;
+  cursor: ew-resize; display: block;
+}
+input[type="range"]::-webkit-slider-runnable-track { height: 15px; background: transparent; border: 0; }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 3px; height: 15px; background: var(--accent); border: 0; border-radius: 0;
+}
+input[type="range"]::-moz-range-track { height: 15px; background: transparent; border: 0; }
+input[type="range"]::-moz-range-thumb {
+  width: 3px; height: 15px; background: var(--accent); border: 0; border-radius: 0;
+}
+
+button {
+  font: inherit; letter-spacing: inherit; text-transform: inherit;
+  background: transparent; color: var(--ink-dim);
+  border: 1px solid transparent; border-radius: 0;
+  padding: 1px 5px; cursor: crosshair;
+}
+button:hover { color: var(--ink); }
+button.on { color: var(--ink); border-color: var(--ink); }
+
+::selection { background: var(--accent); color: var(--bg); }

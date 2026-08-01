@@ -96,6 +96,9 @@ def build(cfg: ScenarioConfig = DEFAULT, *, advisor_name: str = "bayes"):
             "d": [round(b["belief"].get(k, 0.0), 4) for k in order],
             "a": b["action"], "tg": b["target"],
             "x": b["argmax"], "truth": b["truth"],
+            # "r" = the advisor's plain-English reason. Empty for Bayes/Null,
+            # a real sentence for Gemma. The frontend shows it when present.
+            "r": b.get("rationale", ""),
         })
 
     gossip = [e for e in eng.events if e["type"] == "gossip"]

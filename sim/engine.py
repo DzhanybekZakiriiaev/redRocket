@@ -230,6 +230,11 @@ class Engine:
                 "belief": {k: round(v, 4) for k, v in p.belief.items()},
                 "action": p.action.value, "target": p.target,
                 "argmax": top, "truth": self._truth(node, p.target, t),
+                # Natural-language "why", if the advisor produced one. Bayes
+                # leaves this empty by design; Gemma fills it -- and that
+                # self-explanation is the LLM arm's headline advantage, so it
+                # has to survive all the way to the frontend.
+                "rationale": p.rationale,
             })
 
     # -- run ---------------------------------------------------------------
